@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphex - Knowledge Graph Learning Canvas (MVP Demo)</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">Graphex</div>
+        <div style="flex: 1; text-align: center;">
+            <h1 class="document-title" id="documentTitle">Upload a document to begin</h1>
+            <p class="reading-time" id="readingTime" style="display: none;"></p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-secondary" id="helpBtn">Help</button>
+            <button class="btn-secondary" id="settingsBtn">Settings</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Upload State (shown initially) -->
+        <div class="empty-state" id="emptyState">
+            <div class="empty-state-content">
+                <svg class="upload-icon" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <h2>Upload a document to begin</h2>
+                <p class="text-secondary">Supported formats: PDF, TXT, Markdown</p>
+                <div class="upload-actions">
+                    <label for="fileInput" class="btn-primary">
+                        Choose File
+                        <input type="file" id="fileInput" accept=".pdf,.txt,.md" hidden>
+                    </label>
+                    <button class="btn-tertiary" id="sampleDocBtn">Or try our sample article</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Working Area (hidden initially) -->
+        <div class="working-area" id="workingArea" style="display: none;">
+            <!-- Left: Graph Canvas -->
+            <div class="graph-panel">
+                <div class="graph-controls">
+                    <button class="icon-btn" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+                    <button class="icon-btn" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+                    <button class="icon-btn" id="fitScreen" title="Fit to screen" aria-label="Fit graph to screen">⊡</button>
+                </div>
+                <div class="graph-canvas" id="graphCanvas" role="application" aria-label="Knowledge graph visualization">
+                    <div class="mermaid" id="mermaidGraph"></div>
+                </div>
+                <div class="interaction-hint">
+                    <p>Click nodes to read • Click connections to explore relationships</p>
+                </div>
+                <!-- Node Tooltip (hidden by default) -->
+                <div class="node-tooltip" id="nodeTooltip" role="tooltip"></div>
+            </div>
+
+            <!-- Right: Reading Panel -->
+            <div class="reading-panel">
+                <div class="reading-content" id="readingContent">
+                    <div class="reading-placeholder">
+                        <p>Click a node in the graph to view its content</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Note Modal -->
+    <div class="modal-overlay" id="noteModal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="noteModalTitle">Add Note</h3>
+                <button class="close-btn" id="closeNoteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="note-instruction">Capture your understanding in your own words:</p>
+                <textarea
+                    class="note-textarea"
+                    id="noteTextarea"
+                    placeholder="What's the main idea? How does this connect to what you already know?"
+                    rows="8"
+                ></textarea>
+                <div class="note-meta">
+                    <span class="word-count" id="noteWordCount">0 words</span>
+                    <span class="save-status" id="saveStatus"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelNote">Cancel</button>
+                <button class="btn-primary" id="saveNote">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Explanation Modal -->
+    <div class="modal-overlay" id="connectionModal" style="display: none;">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h3 id="connectionModalTitle">Explore Connection</h3>
+                <button class="close-btn" id="closeConnectionModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: User Hypothesis -->
+                <div id="hypothesisStep">
+                    <div class="connection-prompt">
+                        <p class="prompt-title">Before seeing the explanation...</p>
+                        <p>What's your hypothesis? Why might these concepts be connected?</p>
+                    </div>
+                    <textarea
+                        class="note-textarea"
+                        id="hypothesisTextarea"
+                        placeholder="Take a moment to think about how these ideas might relate..."
+                        rows="5"
+                    ></textarea>
+                    <div class="character-count">
+                        <span id="charCount">0</span>/50 characters minimum
+                    </div>
+                    <button class="btn-primary" id="submitHypothesis" disabled>Submit Your Hypothesis</button>
+                </div>
+
+                <!-- Step 2: AI Explanation -->
+                <div id="explanationStep" style="display: none;">
+                    <div class="user-hypothesis-display">
+                        <h4>Your hypothesis:</h4>
+                        <p id="displayHypothesis" class="hypothesis-text"></p>
+                    </div>
+
+                    <div class="ai-explanation">
+                        <h4>AI's explanation:</h4>
+                        <p id="aiExplanation" class="explanation-text"></p>
+                    </div>
+
+                    <div class="source-reference">
+                        <h4>From the source:</h4>
+                        <blockquote id="sourceText"></blockquote>
+                    </div>
+
+                    <div class="self-explanation">
+                        <p class="prompt-title">Now capture this in your own words:</p>
+                        <textarea
+                            class="note-textarea"
+                            id="selfExplanationTextarea"
+                            placeholder="How would you explain this connection to someone else?"
+                            rows="4"
+                        ></textarea>
+                    </div>
+
+                    <button class="btn-primary" id="finishConnection">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <div class="modal-overlay" id="quizModal" style="display: none;">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h3>Test Your Understanding</h3>
+                <button class="close-btn" id="closeQuizModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="quiz-progress">
+                    <span id="quizProgress">Question 1 of 5</span>
+                </div>
+                <div class="quiz-question">
+                    <h4 id="quizQuestionText"></h4>
+                    <div class="quiz-options" id="quizOptions"></div>
+                </div>
+                <div class="quiz-feedback" id="quizFeedback" style="display: none;"></div>
+                <div class="quiz-actions">
+                    <button class="btn-primary" id="submitAnswer" style="display: none;">Submit Answer</button>
+                    <button class="btn-primary" id="nextQuestion" style="display: none;">Next Question</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Results Modal -->
+    <div class="modal-overlay" id="resultsModal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Quiz Results</h3>
+                <button class="close-btn" id="closeResultsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="results-score">
+                    <div class="score-circle">
+                        <span id="scorePercentage">80%</span>
+                    </div>
+                    <p id="scoreMessage">You've got a solid grasp of most concepts</p>
+                </div>
+                <div class="results-details">
+                    <h4>Concepts to review:</h4>
+                    <ul id="reviewList"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" id="returnToGraph">Return to Graph</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Trigger Banner -->
+    <div class="quiz-banner" id="quizBanner" style="display: none;">
+        <p>You've explored several concepts. Want to test your understanding?</p>
+        <div class="banner-actions">
+            <button class="btn-primary btn-small" id="startQuiz">Take Quiz</button>
+            <button class="btn-tertiary btn-small" id="laterQuiz">Maybe later</button>
+        </div>
+    </div>
+
+    <!-- Onboarding Tooltips -->
+    <div class="tooltip-overlay" id="onboardingTooltip" style="display: none;">
+        <div class="tooltip" id="tooltip">
+            <div class="tooltip-content">
+                <h4 id="tooltipTitle"></h4>
+                <p id="tooltipText"></p>
+            </div>
+            <div class="tooltip-actions">
+                <button class="btn-tertiary btn-small" id="skipTour">Skip tour</button>
+                <button class="btn-primary btn-small" id="nextTooltip">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h3 id="loadingTitle">Processing document...</h3>
+            <p id="loadingStep">Parsing document...</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
