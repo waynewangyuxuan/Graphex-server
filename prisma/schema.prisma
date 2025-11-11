@@ -1,0 +1,243 @@
+// Graphex Knowledge Graph Learning Platform
+// Database Schema - PostgreSQL with Prisma ORM
+// Version: 1.0
+// Last Updated: November 11, 2025
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==============================================================================
+// ENUMS
+// ==============================================================================
+
+enum DocumentStatus {
+  processing
+  ready
+  failed
+}
+
+enum SourceType {
+  pdf
+  text
+  markdown
+  url
+}
+
+enum GraphStatus {
+  generating
+  ready
+  failed
+}
+
+enum QuizDifficulty {
+  easy
+  medium
+  hard
+}
+
+// ==============================================================================
+// DOCUMENT MANAGEMENT
+// ==============================================================================
+
+/// Stores uploaded documents and extracted content
+model Document {
+  id            String         @id @default(cuid())
+
+  // Content fields
+  title         String
+  contentText   String         @map("content_text") @db.Text
+
+  // File metadata
+  filePath      String?        @map("file_path") // S3 key or local path
+  sourceUrl     String?        @map("source_url") @db.Text
+  sourceType    SourceType     @map("source_type")
+  fileSize      Int?           @map("file_size") // In bytes
+
+  // Processing status
+  status        DocumentStatus @default(processing)
+  errorMessage  String?        @map("error_message") @db.Text
+
+  // Timestamps
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  graphs        Graph[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+// ==============================================================================
+// KNOWLEDGE GRAPH STRUCTURE
+// ==============================================================================
+
+/// Generated knowledge graphs from documents
+model Graph {
+  id               String       @id @default(cuid())
+
+  // Document relationship
+  documentId       String       @map("document_id")
+  document         Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Graph content
+  mermaidCode      String       @map("mermaid_code") @db.Text
+  layoutConfig     Json?        @map("layout_config") // JSONB: node positions, styling preferences
+
+  // AI metadata
+  generationModel  String       @map("generation_model") // e.g., "claude-sonnet-4"
+
+  // Processing status
+  status           GraphStatus  @default(generating)
+  version          Int          @default(1) // For future graph updates
+
+  // Timestamp
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  nodes            Node[]
+  edges            Edge[]
+  notes            Note[]
+  quizQuestions    QuizQuestion[]
+
+  @@index([documentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("graphs")
+}
+
+/// Individual concepts/nodes in knowledge graphs
+model Node {
+  id              String   @id @default(cuid())
+
+  // Graph relationship
+  graphId         String   @map("graph_id")
+  graph           Graph    @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  // Node content
+  nodeKey         String   @map("node_key") // e.g., "A", "concept1"
+  title           String   // Node display label
+  contentSnippet  String?  @map("content_snippet") @db.Text // Brief description
+
+  // Document references
+  documentRefs    Json?    @map("document_refs") // JSONB: [{start, end, text}] - references to source
+
+  // Position (for future drag-drop functionality)
+  positionX       Float?   @map("position_x")
+  positionY       Float?   @map("position_y")
+
+  // Additional properties
+  metadata        Json?    // JSONB: color, importance, tags, etc.
+
+  // Relations
+  outgoingEdges   Edge[]   @relation("FromNode")
+  incomingEdges   Edge[]   @relation("ToNode")
+  notes           Note[]
+
+  @@unique([graphId, nodeKey])
+  @@index([graphId])
+  @@index([nodeKey])
+  @@map("nodes")
+}
+
+/// Connections/relationships between nodes
+model Edge {
+  id              String   @id @default(cuid())
+
+  // Graph relationship
+  graphId         String   @map("graph_id")
+  graph           Graph    @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  // Node relationships
+  fromNodeId      String   @map("from_node_id")
+  fromNode        Node     @relation("FromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+
+  toNodeId        String   @map("to_node_id")
+  toNode          Node     @relation("ToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  // Edge content
+  relationship    String   // e.g., "supports", "leads_to", "contradicts"
+  aiExplanation   String?  @map("ai_explanation") @db.Text // Cached explanation from AI
+  strength        Float?   // Confidence score (0-1)
+
+  // Additional properties
+  metadata        Json?    // JSONB: additional properties, styling
+
+  // Relations
+  notes           Note[]
+
+  @@unique([graphId, fromNodeId, toNodeId])
+  @@index([graphId])
+  @@index([fromNodeId, toNodeId])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+  @@map("edges")
+}
+
+// ==============================================================================
+// USER ANNOTATIONS (Optional for MVP)
+// ==============================================================================
+
+/// User notes and annotations on graphs, nodes, or edges
+model Note {
+  id        String    @id @default(cuid())
+
+  // Note can be attached to node, edge, or just graph
+  nodeId    String?   @map("node_id")
+  node      Node?     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  edgeId    String?   @map("edge_id")
+  edge      Edge?     @relation(fields: [edgeId], references: [id], onDelete: Cascade)
+
+  graphId   String    @map("graph_id")
+  graph     Graph     @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  // Note content
+  content   String    @db.Text
+
+  // Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([graphId])
+  @@index([nodeId])
+  @@index([edgeId])
+  @@map("notes")
+}
+
+// ==============================================================================
+// QUIZ SYSTEM
+// ==============================================================================
+
+/// AI-generated comprehension questions for graphs
+model QuizQuestion {
+  id             String         @id @default(cuid())
+
+  // Graph relationship
+  graphId        String         @map("graph_id")
+  graph          Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  // Question content
+  questionText   String         @map("question_text") @db.Text
+  options        Json           // JSONB: Array of answer options [{id, text}]
+  correctAnswer  Int            @map("correct_answer") // Index of correct option (0-based)
+  explanation    String         @db.Text // Explanation of correct answer
+
+  // Metadata
+  difficulty     QuizDifficulty @default(medium)
+  nodeRefs       Json?          @map("node_refs") // JSONB: Which nodes this question tests
+
+  // Timestamp
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([graphId])
+  @@index([difficulty])
+  @@map("quiz_questions")
+}
