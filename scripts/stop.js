@@ -16,7 +16,7 @@ const gradient = require('gradient-string');
 const SERVICES = [
   {
     name: 'API Server',
-    command: 'lsof -ti:3000 | xargs kill -9 2>/dev/null || true',
+    command: 'lsof -ti:4000 | xargs kill -9 2>/dev/null || true',
     icon: '🚀',
     color: 'green'
   },

@@ -2,7 +2,7 @@
 
 API documentation for frontend development and testing.
 
-**Base URL**: `http://localhost:3000/api/v1`
+**Base URL**: `http://localhost:4000/api/v1`
 
 **Note**: All endpoints currently return placeholder data. Real implementations require service layer completion.
 
@@ -540,18 +540,18 @@ X-RateLimit-Reset: 1699876543
 
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 
 # Upload document
-curl -X POST http://localhost:3000/api/v1/documents \
+curl -X POST http://localhost:4000/api/v1/documents \
   -F "file=@document.pdf" \
   -F "title=My Document"
 
 # Get document
-curl http://localhost:3000/api/v1/documents/doc_abc123
+curl http://localhost:4000/api/v1/documents/doc_abc123
 
 # Generate graph
-curl -X POST http://localhost:3000/api/v1/graphs/generate \
+curl -X POST http://localhost:4000/api/v1/graphs/generate \
   -H "Content-Type: application/json" \
   -d '{"documentId": "doc_abc123"}'
 ```
@@ -564,7 +564,7 @@ const formData = new FormData();
 formData.append('file', fileInput.files[0]);
 formData.append('title', 'My Document');
 
-const response = await fetch('http://localhost:3000/api/v1/documents', {
+const response = await fetch('http://localhost:4000/api/v1/documents', {
   method: 'POST',
   body: formData
 });
@@ -578,7 +578,7 @@ console.log(data);
 ## CORS
 
 Allowed origins (configured in `.env.development`):
-- `http://localhost:3000`
+- `http://localhost:4000`
 - `http://localhost:5173` (Vite default)
 
 Add your frontend origin to `CORS_ORIGINS` in `.env.development`.

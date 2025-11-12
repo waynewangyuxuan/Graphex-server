@@ -14,7 +14,7 @@ dotenv.config();
  */
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().default('3000'),
+  PORT: z.string().default('4000'),
 
   // Database (to be configured with Prisma)
   DATABASE_URL: z.string().optional(),

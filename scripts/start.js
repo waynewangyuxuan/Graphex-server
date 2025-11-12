@@ -144,8 +144,8 @@ const startService = async (serviceName) => {
         console.log();
         console.log(boxen(
           chalk.green.bold('✓ All services running!') + '\n\n' +
-          chalk.white('API Server: ') + chalk.cyan.underline('http://localhost:3000') + '\n' +
-          chalk.white('Health Check: ') + chalk.cyan.underline('http://localhost:3000/health') + '\n' +
+          chalk.white('API Server: ') + chalk.cyan.underline('http://localhost:4000') + '\n' +
+          chalk.white('Health Check: ') + chalk.cyan.underline('http://localhost:4000/health') + '\n' +
           chalk.white('API Docs: ') + chalk.cyan.underline('See API_REFERENCE.md') + '\n\n' +
           chalk.gray('Press Ctrl+C to stop all services'),
           {
@@ -208,7 +208,7 @@ const main = async () => {
   printBanner();
 
   // Check if API server is already running
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 4000;
   const portInUse = await checkPortInUse(port);
 
   if (portInUse) {

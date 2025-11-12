@@ -57,7 +57,7 @@ npm run restart
 
 1. 🐳 Starts Docker containers (PostgreSQL + Redis)
 2. 🗄️ Runs database migrations
-3. 🚀 Starts API server on `http://localhost:3000`
+3. 🚀 Starts API server on `http://localhost:4000`
 
 You'll see a beautiful console output showing the startup progress!
 
@@ -67,7 +67,7 @@ You'll see a beautiful console output showing the startup progress!
 
 ### Health Check
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 ```
 
 ### Check Running Containers
@@ -88,7 +88,7 @@ npm run logs
 
 Once running, your API is available at:
 
-**Base URL**: `http://localhost:3000/api/v1`
+**Base URL**: `http://localhost:4000/api/v1`
 
 ### Key Endpoints
 
@@ -213,23 +213,23 @@ docker-compose restart redis
 ### Using cURL
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 
 # Upload document (placeholder - returns mock data)
-curl -X POST http://localhost:3000/api/v1/documents \
+curl -X POST http://localhost:4000/api/v1/documents \
   -F "file=@sample.pdf" \
   -F "title=Sample Document"
 ```
 
 ### Using Postman/Insomnia
 1. Import collection (TODO: create collection)
-2. Set base URL: `http://localhost:3000`
+2. Set base URL: `http://localhost:4000`
 3. Test endpoints
 
 ### Using Frontend
 Your frontend can now connect to:
 ```javascript
-const API_BASE_URL = 'http://localhost:3000/api/v1';
+const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 const response = await fetch(`${API_BASE_URL}/health`);
 const data = await response.json();
