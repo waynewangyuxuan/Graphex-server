@@ -241,3 +241,47 @@ model QuizQuestion {
   @@index([difficulty])
   @@map("quiz_questions")
 }
+
+// ==============================================================================
+// COST TRACKING & USAGE ANALYTICS
+// ==============================================================================
+
+/// AI usage tracking for cost management and analytics
+/// CRITICAL: This table prevents financial disaster by tracking all AI costs
+model AIUsage {
+  id            String   @id @default(cuid())
+
+  // User tracking (nullable for MVP without auth)
+  userId        String?  @map("user_id")
+
+  // Operation details
+  operation     String   // 'graph-generation', 'connection-explanation', etc.
+  model         String   // 'claude-sonnet-4', 'gpt-4-turbo', etc.
+
+  // Token usage
+  inputTokens   Int      @map("input_tokens")
+  outputTokens  Int      @map("output_tokens")
+  totalTokens   Int      @map("total_tokens")
+
+  // Cost tracking
+  cost          Float    // In USD
+
+  // Quality metrics
+  qualityScore  Int?     @map("quality_score") // 0-100
+  attempts      Int      @default(1) // Number of retries
+  success       Boolean  @default(true)
+
+  // Related entities (optional)
+  documentId    String?  @map("document_id")
+  graphId       String?  @map("graph_id")
+
+  // Timestamp
+  timestamp     DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([operation])
+  @@index([timestamp])
+  @@index([documentId])
+  @@index([graphId])
+  @@map("ai_usage")
+}

@@ -102,7 +102,9 @@ export const errorHandler = (
     message: 'An unexpected error occurred',
   };
 
-  if (APP_CONFIG.NODE_ENV === 'development') {
+  // WHY: Check process.env directly to support runtime environment changes in tests
+  // This allows tests to modify NODE_ENV without reloading the module
+  if (process.env.NODE_ENV === 'development') {
     unexpectedError.details = err.message;
     unexpectedError.stack = err.stack;
   }

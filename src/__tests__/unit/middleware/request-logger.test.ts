@@ -5,9 +5,13 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { requestIdMiddleware, requestLogger } from '../../../middleware/request-logger.middleware';
 import { ExtendedRequest } from '../../../types/api.types';
 import { logger } from '../../../utils/logger.util';
+
+// Mock uuid BEFORE importing middleware
+// WHY: Jest hoists jest.mock calls, but we need to ensure the mock is set up
+// before the middleware module (which uses uuid) is imported
+jest.mock('uuid');
 
 // Mock logger
 jest.mock('../../../utils/logger.util', () => ({
@@ -19,10 +23,13 @@ jest.mock('../../../utils/logger.util', () => ({
   },
 }));
 
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-uuid-123'),
-}));
+// Import uuid and set up the mock implementation
+import { v4 as uuidv4 } from 'uuid';
+const mockUuidV4 = uuidv4 as jest.MockedFunction<typeof uuidv4>;
+mockUuidV4.mockReturnValue('test-uuid-123');
+
+// Import middleware AFTER mocks are set up
+import { requestIdMiddleware, requestLogger } from '../../../middleware/request-logger.middleware';
 
 describe('Request Logger Middleware Unit Tests', () => {
   let mockRequest: Partial<ExtendedRequest>;
@@ -32,6 +39,10 @@ describe('Request Logger Middleware Unit Tests', () => {
   let onMock: jest.Mock;
 
   beforeEach(() => {
+    // Reset UUID mock to return our test value
+    // WHY: Ensure each test gets the expected UUID value
+    mockUuidV4.mockReturnValue('test-uuid-123');
+
     setHeaderMock = jest.fn();
     onMock = jest.fn((event, callback) => {
       if (event === 'finish') {
@@ -59,6 +70,8 @@ describe('Request Logger Middleware Unit Tests', () => {
     mockNext = jest.fn();
 
     jest.clearAllMocks();
+    // Reset UUID mock again after clearAllMocks
+    mockUuidV4.mockReturnValue('test-uuid-123');
   });
 
   describe('requestIdMiddleware', () => {
