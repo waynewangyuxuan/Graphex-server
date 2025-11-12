@@ -22,12 +22,12 @@ declare global {
 /**
  * Configure Prisma Client options based on environment
  */
-const prismaClientOptions: Prisma.PrismaClientOptions = {
+const prismaClientOptions = {
   log:
     process.env.NODE_ENV === 'development'
-      ? ['query', 'error', 'warn']
-      : ['error'],
-};
+      ? (['query', 'error', 'warn'] as const)
+      : (['error'] as const),
+} satisfies Prisma.PrismaClientOptions;
 
 /**
  * Singleton Prisma Client instance
