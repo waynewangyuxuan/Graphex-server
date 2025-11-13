@@ -247,3 +247,79 @@ Following CLAUDE.md workflow, delegate to infra-deploy-specialist agent:
 - ✅ comprehensive-test-writer (completed - test infrastructure)
 - Next: bullmq-job-processor (async job system)
 - Later: infra-deploy-specialist (Docker, CI/CD)
+---
+
+## 2024-11-12
+
+### Phase 3.3 Text Chunking - COMPLETED
+- [x] Implement `lib/chunking/text-chunker.ts` (text-chunker.ts:62-104)
+  - Smart boundary detection with priority (chapters > sections > paragraphs > sentences)
+  - Greedy chunking algorithm with look-ahead (O(n) complexity)
+  - Overlap injection for context continuity (1k chars between chunks)
+  - Quality scoring system (0-100) with warnings
+  - Handle edge cases (tiny/huge documents, hard splits)
+- [x] Create chunking types (`src/types/chunking.types.ts`)
+  - Updated parameters: maxChunkSize: 30k chars (~7.5k tokens), overlapSize: 1k chars
+  - TextChunk with metadata (overlap tracking, quality indicators, position)
+  - ChunkingResult with statistics and document metadata
+- [x] Fix TypeScript errors (2 defensive programming fixes)
+
+### Phase 3.3 Remaining Components - IN PROGRESS
+
+Following critical review findings (8 issues identified), implement with CORRECTED merge order:
+
+#### Priority 1: Node Deduplicator (Enhanced Algorithm)
+- [ ] Implement multi-phase deduplication (~2 hours)
+  - Phase 1: Exact match (lowercase, trim)
+  - Phase 2: Acronym detection ("ML" = "Machine Learning")
+  - Phase 3: Fuzzy matching with word overlap (Levenshtein + Jaccard)
+  - Use Union-Find for node merging
+  - Preserve best description when merging
+
+#### Priority 2: Graph Validator (Auto-Fix Capability)
+- [ ] Implement validation with auto-fix (~1 hour)
+  - Check: Valid Mermaid syntax
+  - Check: All edges reference valid nodes
+  - Check: No duplicate edges
+  - Check: No isolated nodes (except intentional)
+  - Auto-fix: Remove orphaned edges, deduplicate
+  - Return validation report with warnings
+
+#### Priority 3: Graph Generator Service (CORRECT Merge Order)
+- [ ] Implement graph generation pipeline (~3 hours)
+  - **CRITICAL FIX**: Correct merge order
+    1. Dedupe nodes FIRST (node-deduplicator)
+    2. Remap edges to merged node IDs
+    3. Dedupe edges (check source+target+relationship)
+    4. Validate result (graph-validator with auto-fix)
+  - Cost estimation BEFORE AI processing
+  - Rate limiting: Batch process 2 chunks at a time
+  - Structure-based fallback when AI fails
+  - Generate Mermaid code with proper syntax
+
+#### Priority 4: BullMQ Job System
+- [ ] Set up graph-generation queue (~2 hours)
+  - Priority: medium, timeout: 5min
+  - Worker: `workers/graph-generation.worker.ts`
+  - Retry strategy: exponential backoff (1s, 2s, 4s, 8s), max 3 attempts
+  - Progress tracking: chunk-by-chunk updates
+  - Failed job logging with error details
+
+#### Priority 5: Comprehensive Testing
+- [ ] Write tests for Phase 3.3 components
+  - Text Chunker: unit tests (boundary cases, overlap, quality scoring)
+  - Node Deduplicator: unit tests (exact, acronym, fuzzy matching)
+  - Graph Validator: unit tests (syntax, orphaned edges, auto-fix)
+  - Graph Generator: integration tests (end-to-end chunking → graph)
+  - BullMQ: integration tests (job processing, retry logic)
+
+### Critical Issues from Review (Incorporated Above)
+1. ✅ Merge order bug → CORRECTED in Priority 3
+2. ✅ Missing cost estimation → Added in Priority 3
+3. ✅ Rate limiting → Batch processing in Priority 3
+4. ✅ Edge deduplication → Part of correct merge order
+5. ✅ Fallback mechanism → Structure-based fallback in Priority 3
+6. ✅ Basic node deduplication → Enhanced algorithm in Priority 1
+7. ✅ No validation retry → Auto-fix capability in Priority 2
+8. ✅ Chunking params → Adjusted to 30k/1k in completed Text Chunking
+
