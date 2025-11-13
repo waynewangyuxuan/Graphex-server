@@ -220,21 +220,30 @@ Following CLAUDE.md workflow, delegate to infra-deploy-specialist agent:
 
 ## Current Priority Order (Following CLAUDE.md)
 
+**Completed** (as of 2024-11-12):
+1. ✅ Run Prisma migrations and verify database setup
+2. ✅ Implement service layer - Phase 3.1 & 3.2:
+   - ✅ Document Processor Service v2 (with image extraction)
+   - ✅ AI Output Validator (CRITICAL)
+   - ✅ Cost Tracker Service (CRITICAL)
+   - ✅ Prompt Manager Service (centralized templates, versioning, A/B testing)
+   - ✅ AI Orchestrator Service v2 (validation loops, retry, budget control)
+3. ✅ Write comprehensive tests (187 passing, 95 skipped integration)
+4. ✅ Fix test infrastructure (100% unit test pass rate)
+
 **Next steps** (in order):
-1. Run Prisma migrations and verify database setup
-2. Implement service layer (parallel: document-processor + ai-orchestrator)
-3. Implement BullMQ job system
-4. Implement graph generation pipeline
-5. Replace controller placeholders
-6. Add validation schemas
-7. Write comprehensive tests
-8. Set up Docker and deployment
+1. Implement BullMQ job system for async processing
+2. Implement graph generation pipeline (text chunking, node deduplication)
+3. Replace controller placeholders with real implementations
+4. Add Zod validation schemas for API routes
+5. Set up Docker and deployment (Railway/Render)
+6. Enable integration tests (test database setup)
 
 **Specialized agents to use** (from CLAUDE.md):
-- ✅ prisma-database-architect (completed)
-- ✅ express-api-builder (completed)
-- Next: bullmq-job-processor
-- Next: ai-integration-specialist
-- Next: document-extraction-processor
-- Later: comprehensive-test-writer
-- Later: infra-deploy-specialist
+- ✅ prisma-database-architect (completed - database schema, migrations)
+- ✅ express-api-builder (completed - API foundation)
+- ✅ document-extraction-processor (completed - Phase 3.1)
+- ✅ ai-integration-specialist (completed - Phase 3.2)
+- ✅ comprehensive-test-writer (completed - test infrastructure)
+- Next: bullmq-job-processor (async job system)
+- Later: infra-deploy-specialist (Docker, CI/CD)
