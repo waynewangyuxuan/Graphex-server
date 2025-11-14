@@ -12,7 +12,8 @@ export type PromptType =
   | 'graph-generation'
   | 'connection-explanation'
   | 'quiz-generation'
-  | 'image-description';
+  | 'image-description'
+  | 'node-deduplication';
 
 /**
  * Prompt version for A/B testing and staged rollouts

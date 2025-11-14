@@ -30,6 +30,7 @@ import { AIOrchestrator } from './ai-orchestrator.service';
 import { CostTrackerService } from './cost-tracker.service';
 import { AIGraphOutput } from '../types/validation.types';
 import { ChunkingResult, TextChunk } from '../types/chunking.types';
+import { SemanticNodeDeduplicator } from '../lib/graph/semantic-deduplicator';
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -164,6 +165,7 @@ export class GraphGeneratorService {
     private readonly textChunker: TextChunker,
     private readonly aiOrchestrator: AIOrchestrator,
     private readonly costTracker: CostTrackerService,
+    private readonly semanticDeduplicator: SemanticNodeDeduplicator,
     private readonly logger: Logger,
   ) {
     this.logger.info('Graph Generator Service initialized');
@@ -585,13 +587,25 @@ export class GraphGeneratorService {
       totalEdges: allEdges.length,
     });
 
-    // Step 2: **DEDUPLICATE NODES FIRST** (CRITICAL)
-    const deduplicationResult = this.deduplicateNodes(allNodes);
+    // Step 2: **DEDUPLICATE NODES FIRST** (CRITICAL) - Using semantic deduplication
+    const semanticResult = await this.semanticDeduplicator.deduplicate({
+      nodes: allNodes,
+    });
 
-    this.logger.info('Nodes deduplicated', {
-      before: allNodes.length,
-      after: deduplicationResult.deduplicatedNodes.length,
-      merged: deduplicationResult.mergeCount,
+    // Convert Record<string, string> to Map<string, string> for compatibility
+    const mapping = new Map(Object.entries(semanticResult.mapping));
+
+    const deduplicationResult = {
+      deduplicatedNodes: semanticResult.deduplicatedNodes,
+      mapping,
+      mergeCount: semanticResult.statistics.mergedCount,
+    };
+
+    this.logger.info('Nodes deduplicated (semantic)', {
+      before: semanticResult.statistics.originalCount,
+      after: semanticResult.statistics.finalCount,
+      merged: semanticResult.statistics.mergedCount,
+      mergesByPhase: semanticResult.statistics.mergesByPhase,
     });
 
     // Step 3: **REMAP ALL EDGES** using the mapping (CRITICAL)
@@ -623,9 +637,21 @@ export class GraphGeneratorService {
 
     // Remove edges referencing trimmed nodes
     const finalNodeIds = new Set(finalNodes.map((n) => n.id));
+
+    this.logger.debug('Final node IDs after deduplication', {
+      nodeIds: Array.from(finalNodeIds),
+      edgeSample: uniqueEdges.slice(0, 3).map(e => ({ from: e.from, to: e.to })),
+    });
+
     const finalEdges = uniqueEdges.filter(
       (edge) => finalNodeIds.has(edge.from) && finalNodeIds.has(edge.to),
     );
+
+    this.logger.debug('Edge filtering result', {
+      totalEdges: uniqueEdges.length,
+      validEdges: finalEdges.length,
+      orphanedEdges: uniqueEdges.length - finalEdges.length,
+    });
 
     return {
       nodes: finalNodes,
@@ -640,17 +666,18 @@ export class GraphGeneratorService {
   // ============================================================
 
   /**
-   * Deduplicate nodes using multi-phase algorithm
+   * DEPRECATED: Old naive deduplication (replaced with semantic deduplication)
    *
-   * Phase 1: Exact match (lowercase, trim)
-   * Phase 2: Acronym detection ("ML" = "Machine Learning")
-   * Phase 3: Fuzzy matching with word overlap (prevent false positives)
+   * This method is kept for reference but is no longer used.
+   * The new SemanticNodeDeduplicator provides better quality through:
+   * - Embedding-based similarity (not just string matching)
+   * - LLM validation for borderline cases
+   * - Context-aware merging decisions
    *
-   * Returns: Deduplicated nodes + mapping (oldId -> newId)
-   *
-   * WHY: Multi-phase prevents false positives while catching real duplicates
+   * @deprecated Use SemanticNodeDeduplicator instead
    */
-  private deduplicateNodes(nodes: GraphNode[]): DeduplicationResult {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private deduplicateNodesOld(nodes: GraphNode[]): DeduplicationResult {
     // Use Union-Find for node merging
     const parent = new Map<string, string>();
     const rank = new Map<string, number>();

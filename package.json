@@ -24,7 +24,8 @@
     "down": "node scripts/stop.js",
     "restart": "npm run down && npm run up",
     "logs": "docker-compose logs -f",
-    "ps": "docker-compose ps"
+    "ps": "docker-compose ps",
+    "generate-graph": "tsx scripts/test-graph-generation.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

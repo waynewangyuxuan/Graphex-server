@@ -323,3 +323,125 @@ Following critical review findings (8 issues identified), implement with CORRECT
 7. ✅ No validation retry → Auto-fix capability in Priority 2
 8. ✅ Chunking params → Adjusted to 30k/1k in completed Text Chunking
 
+
+---
+
+## 2024-11-14
+
+### CRITICAL Bug Fix Session - COMPLETED
+
+- [x] **Diagnosed catastrophic over-merge bug** (22→2 nodes)
+  - Root cause: Prompt-code interface mismatch (id/fromNodeId fields)
+  - Detection: CRITICAL DEBUG logging revealed `id: undefined` pattern
+  
+- [x] **Fixed prompt template structure**
+  - Changed `"key"` → `"id"`, `"from"` → `"fromNodeId"`, `"to"` → `"toNodeId"`
+  - Wrapped fields in proper `metadata` structure
+  - Added "Return ONLY JSON" instruction to prevent parse errors
+  
+- [x] **Integrated semantic deduplication**
+  - Replaced naive string matching with 4-phase semantic algorithm
+  - Using OpenAI embeddings for similarity detection
+  - Prevents false positives with dual thresholds
+  
+- [x] **Added relationship type taxonomy**
+  - 21 specific relationship types across 5 categories
+  - Hierarchical, Functional, Technical, Process, Comparative
+  - Prohibits vague relationships (relates to, involves)
+  
+- [x] **Created comprehensive documentation**
+  - Session summary with root cause analysis
+  - Quality improvement analysis
+  - Few-shot examples proposal (domain-agnostic)
+  - 7 documentation files totaling ~4,500 lines
+
+### Test Results After Fixes
+
+- **Deduplication**: 22 → 15 nodes (appropriate 32% vs catastrophic 91%)
+- **Quality score**: 90/100 (good structure with minor issues)
+- **Relationship quality**: Expected improvement with taxonomy (pending full test)
+
+### Immediate Next Steps
+
+- [ ] **Test improved prompt on diverse documents**
+  - Try biology paper, economics paper, physics paper
+  - Verify domain-agnostic capability
+  - Confirm relationship taxonomy improves specificity
+  
+- [ ] **Validate quality improvements**
+  - Expected quality score: 95-98/100
+  - Verify no domain examples in nodes
+  - Verify specific relationships (not vague)
+  
+- [ ] **Consider validation layer**
+  - Add runtime checks that prompt output matches TypeScript interface
+  - Prevent future prompt-code contract mismatches
+  - Could use Zod schema validation on AI responses
+
+### Short-term Improvements (Optional)
+
+- [ ] **Implement LLM validation for semantic deduplication**
+  - Phase 4.4 of semantic algorithm
+  - For borderline cases (0.65-0.95 similarity)
+  - Batch validation (10 pairs per call)
+  - Cost: ~$0.002 per validation batch
+  
+- [ ] **Add few-shot examples if needed**
+  - Use FEW_SHOT_EXAMPLES_PROPOSAL.md as reference
+  - Domain-diverse examples (CS, Biology, Economics, Physics, Literature)
+  - Only if quality issues persist with current taxonomy
+  
+- [ ] **Create ground truth labels**
+  - Label 5-10 test documents manually
+  - Measure precision/recall of concept extraction
+  - Use for continuous quality monitoring
+
+### Phase 3.4 - BullMQ Job System (Ready to Begin)
+
+Following previous TODO plan with graph generation pipeline now fully operational:
+
+- [ ] Set up graph-generation queue
+  - Priority: medium, timeout: 5min
+  - Worker: `workers/graph-generation.worker.ts`
+  - Retry strategy: exponential backoff (1s, 2s, 4s, 8s), max 3 attempts
+  
+- [ ] Implement progress tracking
+  - Chunk-by-chunk updates (0% → 100%)
+  - Real-time status for frontend
+  - Failed job logging with error details
+  
+- [ ] Integrate with Graph Generator Service
+  - Use semantic deduplication
+  - Use relationship taxonomy
+  - Proper error handling and recovery
+
+### Lessons Learned (For Future Reference)
+
+**1. Prompt-Code Contracts**:
+- Silent failures when mismatched
+- Add validation layer (Zod schemas on AI output)
+- Test with real examples early
+
+**2. User Feedback**:
+- Iterate based on actual usage, not assumptions
+- Start minimal, add complexity on demand
+- Quality is subjective - align with user expectations
+
+**3. Debug Logging**:
+- CRITICAL DEBUG logs save hours of debugging
+- Log input/output samples, especially IDs
+- Invest in comprehensive logging upfront
+
+**4. Simplicity**:
+- User rejected over-engineering (wanted clean version)
+- Add features incrementally based on need
+- Avoid premature optimization
+
+---
+
+**Current Status**: ✅ All critical bugs fixed, system operational
+
+**Quality**: 90/100 (expected 95-98/100 with taxonomy validation)
+
+**Ready for**: Production testing with diverse documents, BullMQ integration
+

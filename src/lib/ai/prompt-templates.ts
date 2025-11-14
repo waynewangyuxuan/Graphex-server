@@ -48,11 +48,46 @@ Content:
 - Each concept should be understandable to the target learning audience
 
 ### Relationships (Edges)
-- Identify meaningful relationships between concepts
-- Relationships must be SPECIFIC, not generic
-- Good: "enables", "requires", "contradicts", "is composed of", "leads to"
-- Bad: "relates to", "connects to", "associated with"
-- Each relationship should help learners understand how concepts interact
+Use SPECIFIC relationship types from this taxonomy:
+
+**Hierarchical relationships:**
+- "is-a" (inheritance/classification)
+- "part-of" (composition)
+- "has-component" (system contains parts)
+- "instance-of" (specialization)
+- "has-mode" (variant or operating mode)
+
+**Functional relationships:**
+- "enables" (makes possible)
+- "requires" (dependency)
+- "produces" (output/result)
+- "consumes" (input)
+- "leverages" (uses capability)
+- "supports" (aids or assists)
+
+**Technical relationships:**
+- "trained-via" (learning method)
+- "embedded-by" (representation method)
+- "retrieved-from" (data source)
+- "implements" (concrete realization)
+
+**Process relationships:**
+- "precedes" (temporal sequence)
+- "triggers" (causation)
+- "leads to" (consequence)
+
+**Comparative relationships:**
+- "contradicts" (opposition)
+- "strengthens" (reinforcement)
+- "challenges" (questions or tests)
+
+**AVOID vague relationships:**
+- ❌ "relates to"
+- ❌ "connects to"
+- ❌ "associated with"
+- ❌ "involves"
+
+Each relationship should help learners understand how concepts interact
 
 ### Source Grounding (CRITICAL)
 - ONLY extract concepts that are explicitly discussed in the document
@@ -67,33 +102,39 @@ Return a JSON object with this EXACT structure:
   "mermaidCode": "flowchart TD\\n  A[Concept 1] --> B[Concept 2]\\n  B --> C[Concept 3]",
   "nodes": [
     {
-      "key": "A",
+      "id": "A",
       "title": "Concept Name",
-      "snippet": "Brief 1-2 sentence description from the document",
-      "documentRefs": [
-        {
-          "start": 150,
-          "end": 320,
-          "text": "exact quote from document mentioning this concept"
-        }
-      ]
+      "description": "Brief 1-2 sentence description from the document",
+      "metadata": {
+        "documentRefs": [
+          {
+            "start": 150,
+            "end": 320,
+            "text": "exact quote from document mentioning this concept"
+          }
+        ]
+      }
     }
   ],
   "edges": [
     {
-      "from": "A",
-      "to": "B",
+      "fromNodeId": "A",
+      "toNodeId": "B",
       "relationship": "enables",
-      "strength": 0.9
+      "metadata": {
+        "strength": 0.9
+      }
     }
   ]
 }
 
 ## Constraints
 - Minimum 7 nodes, maximum 15 nodes
-- Each node MUST have at least one documentRef
+- Each node MUST have unique id (A, B, C, etc.)
+- Each node MUST have at least one documentRef in metadata
 - Mermaid syntax must be valid (test it mentally)
-- All node keys referenced in edges must exist in nodes array
+- All node IDs referenced in edges must exist in nodes array
+- Use fromNodeId and toNodeId fields for edges (not "from" and "to")
 - Relationship types must be specific verbs/phrases
 - If document is too short or lacks coherent concepts, return minimal graph with explanation
 
@@ -103,7 +144,9 @@ Return a JSON object with this EXACT structure:
 - If unsure, prefer fewer high-quality nodes over many low-quality ones
 - All snippets and documentRefs must be verbatim from source text
 
-Begin analysis:`,
+IMPORTANT: Return ONLY the JSON object, no explanations or commentary.
+
+Begin:`,
     metadata: {
       author: 'Graphex Team',
       created: new Date('2024-11-11'),

@@ -40,7 +40,16 @@
       "Bash(for file in /Users/waynewang/Graphex-server/src/__tests__/integration/*.test.ts)",
       "Bash(do:*)",
       "Bash(done)",
-      "Bash(for file in src/__tests__/integration/{graphs,connections,quizzes,notes}.test.ts)"
+      "Bash(for file in src/__tests__/integration/{graphs,connections,quizzes,notes}.test.ts)",
+      "Bash(/Users/waynewang/Graphex-server/META/PROGRESS.md)",
+      "Bash(node:*)",
+      "Bash(npm run generate-graph:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(redis-cli:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

@@ -301,7 +301,8 @@ export class AIOrchestrator {
             rawResponse,
             validation,
             builtPrompt,
-            attempts
+            attempts,
+            currentModel  // Pass model key for cost calculation
           );
         }
 
@@ -673,7 +674,8 @@ export class AIOrchestrator {
     rawResponse: AIRawResponse,
     validation: ValidationResult,
     builtPrompt: BuiltPrompt,
-    attempts: number
+    attempts: number,
+    modelKey: string  // Model key for cost lookup (e.g., 'claude-haiku')
   ): AIResponse<T> {
     const cost = this.aiClient.calculateCost(
       {
@@ -681,7 +683,7 @@ export class AIOrchestrator {
         output: rawResponse.usage.outputTokens,
         total: rawResponse.usage.totalTokens,
       },
-      rawResponse.model
+      modelKey  // Use model key instead of API model name
     );
 
     return {

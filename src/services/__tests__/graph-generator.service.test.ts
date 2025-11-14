@@ -18,6 +18,7 @@ import { TextChunker } from '../../lib/chunking/text-chunker';
 import { AIOrchestrator } from '../ai-orchestrator.service';
 import { CostTrackerService } from '../cost-tracker.service';
 import { AIGraphOutput } from '../../types/validation.types';
+import { SemanticNodeDeduplicator } from '../../lib/graph/semantic-deduplicator';
 
 // ============================================================
 // MOCKS
@@ -42,6 +43,10 @@ const mockCostTracker = {
   checkBudget: jest.fn(),
   recordUsage: jest.fn(),
 } as unknown as CostTrackerService;
+
+const mockSemanticDeduplicator = {
+  deduplicate: jest.fn(),
+} as unknown as SemanticNodeDeduplicator;
 
 // ============================================================
 // TEST DATA
@@ -141,8 +146,21 @@ describe('GraphGeneratorService', () => {
       mockTextChunker,
       mockAIOrchestrator,
       mockCostTracker,
+      mockSemanticDeduplicator,
       mockLogger,
     );
+
+    // Default mock behavior for semantic deduplicator
+    (mockSemanticDeduplicator.deduplicate as jest.Mock).mockResolvedValue({
+      deduplicatedNodes: [],
+      mapping: {},
+      statistics: {
+        originalCount: 0,
+        finalCount: 0,
+        mergedCount: 0,
+        mergesByPhase: { exact: 0, acronym: 0, fuzzy: 0 },
+      },
+    });
 
     // Default mocks
     (mockCostTracker.checkBudget as jest.Mock).mockResolvedValue({
