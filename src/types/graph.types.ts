@@ -72,6 +72,51 @@ export interface ConnectionExplainResponse {
 // ===== Graph Structure Types =====
 
 /**
+ * Node content type classification
+ * WHY: Enables semantic search and better understanding of node roles
+ */
+export enum NodeType {
+  // Core Knowledge
+  CONCEPT = 'concept',
+  DEFINITION = 'definition',
+  THEORY = 'theory',
+
+  // Evidence & Support
+  FACT = 'fact',
+  EVIDENCE = 'evidence',
+  EXAMPLE = 'example',
+  STATISTIC = 'statistic',
+
+  // Argumentation
+  ARGUMENT = 'argument',
+  PREMISE = 'premise',
+  CONCLUSION = 'conclusion',
+  COUNTERARGUMENT = 'counterargument',
+
+  // Actors & Entities
+  PERSON = 'person',
+  ORGANIZATION = 'organization',
+  PLACE = 'place',
+  EVENT = 'event',
+
+  // Process & Method
+  METHOD = 'method',
+  PROCESS = 'process',
+  MECHANISM = 'mechanism',
+  ALGORITHM = 'algorithm',
+
+  // Comparison & Analysis
+  COMPARISON = 'comparison',
+  CLASSIFICATION = 'classification',
+  ANALYSIS = 'analysis',
+
+  // Problem Solving
+  QUESTION = 'question',
+  PROBLEM = 'problem',
+  SOLUTION = 'solution',
+}
+
+/**
  * A node in a knowledge graph
  */
 export interface GraphNode {
@@ -81,8 +126,14 @@ export interface GraphNode {
   /** Display label (concept name) */
   title: string;
 
-  /** Optional detailed description */
+  /** Optional detailed description (legacy) */
   description?: string;
+
+  /** Semantic classification of node content */
+  nodeType?: NodeType | string;
+
+  /** Contextual 2-sentence summary from document */
+  summary?: string;
 
   /** Source text references */
   sourceReferences?: Array<{
@@ -147,7 +198,7 @@ export interface GraphData {
  */
 export interface DeduplicationInput {
   /** Nodes to deduplicate */
-  nodes: Array<{ id: string; title: string; description?: string }>;
+  nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
 }
 
 /**
@@ -155,7 +206,7 @@ export interface DeduplicationInput {
  */
 export interface DeduplicationResult {
   /** Deduplicated nodes (merged) */
-  deduplicatedNodes: Array<{ id: string; title: string; description?: string }>;
+  deduplicatedNodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
 
   /** Mapping from old node IDs to new node IDs */
   mapping: Record<string, string>;

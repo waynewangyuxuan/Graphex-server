@@ -124,7 +124,11 @@ model Node {
   // Node content
   nodeKey         String   @map("node_key") // e.g., "A", "concept1"
   title           String   // Node display label
-  contentSnippet  String?  @map("content_snippet") @db.Text // Brief description
+  contentSnippet  String?  @map("content_snippet") @db.Text // Brief description (legacy)
+
+  // Enhanced semantic fields (v2)
+  nodeType        String?  @map("node_type") // concept, fact, argument, person, method, etc.
+  summary         String?  @db.Text // 2-sentence contextual summary from document
 
   // Document references
   documentRefs    Json?    @map("document_refs") // JSONB: [{start, end, text}] - references to source
@@ -144,6 +148,7 @@ model Node {
   @@unique([graphId, nodeKey])
   @@index([graphId])
   @@index([nodeKey])
+  @@index([nodeType]) // Enable search by type
   @@map("nodes")
 }
 

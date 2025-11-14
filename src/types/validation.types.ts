@@ -203,6 +203,8 @@ export interface AIGraphOutput {
     id: string;
     title: string;
     description?: string;
+    nodeType?: string; // Semantic classification (concept, fact, argument, etc.)
+    summary?: string; // 2-sentence contextual summary
     metadata?: Record<string, unknown>;
   }>;
 

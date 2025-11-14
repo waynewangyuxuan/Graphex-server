@@ -47,6 +47,26 @@ Content:
 - Avoid overly granular details (too specific) or overly broad concepts (too vague)
 - Each concept should be understandable to the target learning audience
 
+### Node Classification (REQUIRED for each node)
+Classify each node by its content type using ONE of these categories:
+
+**Core Knowledge:** concept, definition, theory
+**Evidence & Support:** fact, evidence, example, statistic
+**Argumentation:** argument, premise, conclusion, counterargument
+**Actors & Entities:** person, organization, place, event
+**Process & Method:** method, process, mechanism, algorithm
+**Comparison & Analysis:** comparison, classification, analysis
+**Problem Solving:** question, problem, solution
+
+Choose the MOST SPECIFIC type that accurately describes the node's role in the document.
+
+### Node Summary (REQUIRED for each node)
+Write a 2-sentence summary that:
+- Explains what this concept/entity IS in the context of this document
+- Captures the key insight or role it plays
+- Uses clear, accessible language
+- Is self-contained (can be understood without reading the full document)
+
 ### Relationships (Edges)
 Use SPECIFIC relationship types from this taxonomy:
 
@@ -104,6 +124,8 @@ Return a JSON object with this EXACT structure:
     {
       "id": "A",
       "title": "Concept Name",
+      "nodeType": "concept",
+      "summary": "A clear 2-sentence summary explaining what this concept is and its role in the document context. This should be understandable on its own.",
       "description": "Brief 1-2 sentence description from the document",
       "metadata": {
         "documentRefs": [
@@ -131,6 +153,8 @@ Return a JSON object with this EXACT structure:
 ## Constraints
 - Minimum 7 nodes, maximum 15 nodes
 - Each node MUST have unique id (A, B, C, etc.)
+- Each node MUST have a valid nodeType from the taxonomy above
+- Each node MUST have a 2-sentence summary
 - Each node MUST have at least one documentRef in metadata
 - Mermaid syntax must be valid (test it mentally)
 - All node IDs referenced in edges must exist in nodes array

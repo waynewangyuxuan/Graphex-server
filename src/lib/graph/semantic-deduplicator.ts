@@ -508,10 +508,10 @@ export class SemanticNodeDeduplicator {
    * Build final deduplicated result
    */
   private buildResult(
-    nodes: Array<{ id: string; title: string; description?: string }>,
+    nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>,
     uf: UnionFind,
   ): {
-    deduplicatedNodes: Array<{ id: string; title: string; description?: string }>;
+    deduplicatedNodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
     mapping: Record<string, string>;
   } {
     const groups = uf.getGroups();
@@ -519,6 +519,8 @@ export class SemanticNodeDeduplicator {
       id: string;
       title: string;
       description?: string;
+      nodeType?: string;
+      summary?: string;
     }> = [];
     const mapping: Record<string, string> = {};
 
@@ -534,6 +536,8 @@ export class SemanticNodeDeduplicator {
         id: root,
         title: representative.title,
         description: representative.description,
+        nodeType: representative.nodeType, // Preserve semantic classification
+        summary: representative.summary, // Preserve contextual summary
       });
 
       // Map all members to root
@@ -549,8 +553,8 @@ export class SemanticNodeDeduplicator {
    * Choose best node from a group (most informative)
    */
   private chooseBestNode(
-    nodes: Array<{ id: string; title: string; description?: string }>,
-  ): { id: string; title: string; description?: string } {
+    nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>,
+  ): { id: string; title: string; description?: string; nodeType?: string; summary?: string } {
     return nodes.reduce((best, current) => {
       const bestScore = this.nodeQualityScore(best);
       const currentScore = this.nodeQualityScore(current);
@@ -564,10 +568,12 @@ export class SemanticNodeDeduplicator {
   private nodeQualityScore(node: {
     title: string;
     description?: string;
+    summary?: string;
   }): number {
     let score = 0;
     score += node.title.length; // Longer title = more specific
     score += (node.description?.length || 0) * 2; // Description very valuable
+    score += (node.summary?.length || 0) * 2.5; // Summary even more valuable (it's more specific)
     return score;
   }
 

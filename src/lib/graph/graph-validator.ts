@@ -229,6 +229,8 @@ export class GraphValidator {
     for (let i = 0; i < graph.nodes.length; i++) {
       const node = graph.nodes[i];
 
+      if (!node) continue; // Skip if node is undefined
+
       if (!node.id || typeof node.id !== 'string' || node.id.trim() === '') {
         errors.push({
           code: ValidationErrorCode.MISSING_NODE_ID,
@@ -257,6 +259,8 @@ export class GraphValidator {
   private checkEdgeFields(graph: GraphData, errors: ValidationError[]): void {
     for (let i = 0; i < graph.edges.length; i++) {
       const edge = graph.edges[i];
+
+      if (!edge) continue; // Skip if edge is undefined
 
       if (!edge.from || typeof edge.from !== 'string') {
         errors.push({
@@ -326,6 +330,7 @@ export class GraphValidator {
 
     for (let i = 0; i < graph.edges.length; i++) {
       const edge = graph.edges[i];
+      if (!edge) continue; // Skip if edge is undefined
 
       if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
         orphanedIndices.push(i);
@@ -344,6 +349,7 @@ export class GraphValidator {
     const duplicateIndices: number[] = [];
 
     for (let i = 0; i < graph.edges.length; i++) {
+      if (!edge) continue; // Skip if edge is undefined
       const edge = graph.edges[i];
       const key = `${edge.from}|${edge.to}|${edge.relationship}`;
 
@@ -364,6 +370,7 @@ export class GraphValidator {
   private findSelfReferences(graph: GraphData): number[] {
     const selfRefIndices: number[] = [];
 
+      if (!edge) continue; // Skip if edge is undefined
     for (let i = 0; i < graph.edges.length; i++) {
       const edge = graph.edges[i];
 

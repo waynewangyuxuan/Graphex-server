@@ -65,6 +65,8 @@ export interface GraphNode {
   id: string;
   title: string;
   description?: string;
+  nodeType?: string; // Semantic classification (concept, fact, argument, etc.)
+  summary?: string; // 2-sentence contextual summary
   sourceChunk?: number; // Which chunk this came from
   metadata?: Record<string, unknown>;
 }
@@ -566,6 +568,8 @@ export class GraphGeneratorService {
           id: `${i}_${node.id}`, // Prefix with chunk index to avoid collisions
           title: node.title,
           description: node.description,
+          nodeType: node.nodeType, // Semantic classification
+          summary: node.summary, // 2-sentence contextual summary
           sourceChunk: i,
           metadata: node.metadata,
         });
