@@ -40,12 +40,75 @@ export const generateGraph = async (
 
   try {
     // Extract validated data (validated by Zod middleware)
-    const { documentText, documentTitle, userId, options } = req.body;
+    const { documentId, documentText, documentTitle, userId, options } = req.body;
+
+    // Determine document source and text
+    let finalDocumentText: string;
+    let finalDocumentTitle: string;
+    let finalDocumentId: string;
+
+    if (documentId) {
+      // Mode A: Lookup document from database
+      logger.info('Looking up document for graph generation', {
+        requestId: extReq.requestId,
+        documentId,
+      });
+
+      const document = await prisma.document.findUnique({
+        where: { id: documentId },
+      });
+
+      if (!document) {
+        return sendError(
+          res,
+          ErrorCode.DOCUMENT_NOT_FOUND,
+          `Document with ID '${documentId}' not found`,
+          404,
+          extReq.requestId
+        );
+      }
+
+      if (document.status !== 'ready') {
+        return sendError(
+          res,
+          ErrorCode.PROCESSING_FAILED,
+          `Document is not ready. Current status: ${document.status}`,
+          400,
+          extReq.requestId
+        );
+      }
+
+      finalDocumentText = document.contentText;
+      finalDocumentTitle = document.title;
+      finalDocumentId = document.id;
+    } else {
+      // Mode B: Direct text (backward compatibility)
+      finalDocumentText = documentText!; // Non-null assertion safe due to Zod validation
+      finalDocumentTitle = documentTitle || 'Untitled Document';
+
+      // Create temporary document record for direct text
+      logger.info('Creating temporary document record for direct text', {
+        requestId: extReq.requestId,
+        documentLength: finalDocumentText.length,
+      });
+
+      const tempDoc = await prisma.document.create({
+        data: {
+          title: finalDocumentTitle,
+          contentText: finalDocumentText,
+          sourceType: 'text',
+          status: 'ready',
+        },
+      });
+
+      finalDocumentId = tempDoc.id;
+    }
 
     logger.info('Starting graph generation', {
       requestId: extReq.requestId,
-      documentLength: documentText?.length,
-      documentTitle,
+      documentId: finalDocumentId,
+      documentLength: finalDocumentText.length,
+      documentTitle: finalDocumentTitle,
       maxNodes: options?.maxNodes,
     });
 
@@ -53,9 +116,9 @@ export const generateGraph = async (
     const graphGenerator = services.getGraphGenerator();
 
     const result = await graphGenerator.generateGraph({
-      documentId: extReq.requestId, // Use request ID as temp document ID
-      documentText,
-      documentTitle: documentTitle || 'Untitled Document',
+      documentId: finalDocumentId,
+      documentText: finalDocumentText,
+      documentTitle: finalDocumentTitle,
       options: {
         maxNodes: options?.maxNodes || 15,
         skipCache: options?.skipCache || false,
@@ -70,11 +133,10 @@ export const generateGraph = async (
       durationMs: Date.now() - startTime,
     });
 
-    // Save to database
+    // Save to database (link to existing document)
     const savedGraph = await saveGraphToDatabase(
       result,
-      documentTitle || 'Untitled Document',
-      documentText,
+      finalDocumentId,
       userId
     );
 
@@ -302,6 +364,8 @@ export const getJobStatus = async (
  *
  * WHY: Atomic transaction ensures all nodes and edges are saved together.
  * If any part fails, entire operation rolls back.
+ *
+ * Updated: Links to existing document instead of creating new one
  */
 async function saveGraphToDatabase(
   graphResult: {
@@ -332,26 +396,15 @@ async function saveGraphToDatabase(
       fallbackUsed: boolean;
     };
   },
-  documentTitle: string,
-  documentText: string,
+  documentId: string,
   _userId?: string // Prefixed with _ to indicate intentionally unused
 ): Promise<{ id: string }> {
   // Use transaction to ensure atomicity
   return await prisma.$transaction(async (tx) => {
-    // 1. Create document record
-    const document = await tx.document.create({
-      data: {
-        title: documentTitle,
-        contentText: documentText,
-        sourceType: 'text',
-        status: 'ready',
-      },
-    });
-
-    // 2. Create graph record
+    // 1. Create graph record (link to existing document)
     const graph = await tx.graph.create({
       data: {
-        documentId: document.id,
+        documentId,
         mermaidCode: graphResult.mermaidCode,
         generationModel: graphResult.metadata.model,
         status: GraphStatus.READY,
@@ -359,10 +412,10 @@ async function saveGraphToDatabase(
       },
     });
 
-    // 3. Create node ID mapping (graphResult.id -> database.id)
+    // 2. Create node ID mapping (graphResult.id -> database.id)
     const nodeIdMapping = new Map<string, string>();
 
-    // 4. Create all nodes
+    // 3. Create all nodes
     for (const node of graphResult.nodes) {
       const createdNode = await tx.node.create({
         data: {
@@ -380,7 +433,7 @@ async function saveGraphToDatabase(
       nodeIdMapping.set(node.id, createdNode.id);
     }
 
-    // 5. Create all edges (using mapped node IDs)
+    // 4. Create all edges (using mapped node IDs)
     for (const edge of graphResult.edges) {
       const fromNodeId = nodeIdMapping.get(edge.from);
       const toNodeId = nodeIdMapping.get(edge.to);
@@ -408,7 +461,7 @@ async function saveGraphToDatabase(
 
     logger.info('Graph saved to database', {
       graphId: graph.id,
-      documentId: document.id,
+      documentId,
       nodeCount: graphResult.nodes.length,
       edgeCount: graphResult.edges.length,
     });

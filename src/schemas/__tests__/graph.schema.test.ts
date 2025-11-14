@@ -25,6 +25,168 @@ describe('Graph Validation Schemas', () => {
   // ============================================================
 
   describe('GraphGenerationRequestSchema', () => {
+    // ============================================================
+    // REFINEMENT: documentId OR documentText required
+    // ============================================================
+
+    describe('refinement: documentId OR documentText', () => {
+      it('should accept request with documentId only (Mode A)', () => {
+        const validData = {
+          body: {
+            documentId: 'clhv7w8kz0000qz0z0z0z0z0z',
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.body.documentId).toBe('clhv7w8kz0000qz0z0z0z0z0z');
+          expect(result.data.body.documentText).toBeUndefined();
+        }
+      });
+
+      it('should accept request with documentText only (Mode B)', () => {
+        const validData = {
+          body: {
+            documentText: 'This is a valid document with sufficient length. '.repeat(5),
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.body.documentText).toBeDefined();
+          expect(result.data.body.documentId).toBeUndefined();
+        }
+      });
+
+      it('should accept request with both documentId and documentText', () => {
+        const validData = {
+          body: {
+            documentId: 'doc-123',
+            documentText: 'This is a valid document with sufficient length. '.repeat(5),
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          // When both provided, controller will prefer documentId
+          expect(result.data.body.documentId).toBe('doc-123');
+          expect(result.data.body.documentText).toBeDefined();
+        }
+      });
+
+      it('should reject request with neither documentId nor documentText', () => {
+        const invalidData = {
+          body: {
+            documentTitle: 'Test',
+            options: {
+              maxNodes: 15,
+            },
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(invalidData);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toContain(
+            'Either documentId or documentText must be provided'
+          );
+        }
+      });
+
+      it('should reject request with empty documentId and no documentText', () => {
+        const invalidData = {
+          body: {
+            documentId: '',
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(invalidData);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    // ============================================================
+    // documentId validation
+    // ============================================================
+
+    describe('documentId validation', () => {
+      it('should accept valid CUID documentId', () => {
+        const validData = {
+          body: {
+            documentId: 'clhv7w8kz0000qz0z0z0z0z0z',
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept valid UUID documentId', () => {
+        const validData = {
+          body: {
+            documentId: '550e8400-e29b-41d4-a716-446655440000',
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should accept simple string documentId', () => {
+        const validData = {
+          body: {
+            documentId: 'doc-123-abc',
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(validData);
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should reject empty documentId when provided', () => {
+        const invalidData = {
+          body: {
+            documentId: '',
+            documentText: 'x'.repeat(100), // Need text to pass refinement
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(invalidData);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toContain('cannot be empty');
+        }
+      });
+
+      it('should reject non-string documentId', () => {
+        const invalidData = {
+          body: {
+            documentId: 12345,
+          },
+        };
+
+        const result = GraphGenerationRequestSchema.safeParse(invalidData);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    // ============================================================
+    // documentText validation
+    // ============================================================
+
     describe('documentText validation', () => {
       it('should accept valid document text', () => {
         const validData = {
@@ -74,7 +236,7 @@ describe('Graph Validation Schemas', () => {
         }
       });
 
-      it('should reject missing document text', () => {
+      it('should reject missing document text when documentId also missing', () => {
         const invalidData = {
           body: {
             documentTitle: 'Test',
@@ -85,7 +247,10 @@ describe('Graph Validation Schemas', () => {
 
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error.issues[0].path).toContain('documentText');
+          // With the refinement, the error path will be 'documentId' since refinement checks both
+          expect(result.error.issues[0].message).toContain(
+            'Either documentId or documentText must be provided'
+          );
         }
       });
 

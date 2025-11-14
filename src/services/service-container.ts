@@ -15,6 +15,7 @@ import { GraphGeneratorService } from './graph-generator.service';
 import { AIOrchestrator } from './ai-orchestrator.service';
 import { CostTrackerService } from './cost-tracker.service';
 import { PromptManagerService } from './prompt-manager.service';
+import { DocumentProcessorService } from './document-processor.service';
 
 import { TextChunker } from '../lib/chunking/text-chunker';
 import { SemanticNodeDeduplicator } from '../lib/graph/semantic-deduplicator';
@@ -44,6 +45,7 @@ class ServiceContainer {
   private _embeddingService?: EmbeddingService;
   private _semanticDeduplicator?: SemanticNodeDeduplicator;
   private _graphGenerator?: GraphGeneratorService;
+  private _documentProcessor?: DocumentProcessorService;
 
   private constructor() {
     // Private constructor for singleton
@@ -83,8 +85,8 @@ class ServiceContainer {
         {
           anthropicApiKey: env.ANTHROPIC_API_KEY || '',
           openaiApiKey: env.OPENAI_API_KEY || '',
-          defaultProvider: 'anthropic',
-          timeout: 30000,
+          defaultTimeout: 30000,
+          enableLogging: true,
         },
         logger
       );
@@ -170,9 +172,8 @@ class ServiceContainer {
         {
           apiKey: env.OPENAI_API_KEY || '',
           model: 'text-embedding-3-small',
-          dimensions: 512,
+          batchSize: 100,
           timeout: 10000,
-          cacheTTL: 3600,
         },
         this.getLogger()
       );
@@ -213,6 +214,17 @@ class ServiceContainer {
   }
 
   /**
+   * Get Document Processor Service
+   * WHY: Handles file upload processing, text extraction, and quality assessment
+   */
+  getDocumentProcessorService(): DocumentProcessorService {
+    if (!this._documentProcessor) {
+      this._documentProcessor = new DocumentProcessorService();
+    }
+    return this._documentProcessor;
+  }
+
+  /**
    * Reset all services (for testing)
    */
   reset(): void {
@@ -225,6 +237,7 @@ class ServiceContainer {
     this._embeddingService = undefined;
     this._semanticDeduplicator = undefined;
     this._graphGenerator = undefined;
+    this._documentProcessor = undefined;
   }
 }
 

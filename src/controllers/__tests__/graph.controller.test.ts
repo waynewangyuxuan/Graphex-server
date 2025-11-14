@@ -72,7 +72,7 @@ describe('Graph Controller', () => {
   // ============================================================
 
   describe('generateGraph', () => {
-    const validRequestBody = {
+    const validRequestBodyText = {
       documentText: 'This is a test document with sufficient length to pass validation. '.repeat(5),
       documentTitle: 'Test Document',
       userId: 'test-user-123',
@@ -84,103 +84,411 @@ describe('Graph Controller', () => {
 
     beforeEach(() => {
       mockRequest = {
-        body: validRequestBody,
+        body: validRequestBodyText,
         requestId: 'test-request-123',
       } as ExtendedRequest;
+
+      // Mock Prisma document methods for dual-mode tests
+      (prisma.document.findUnique as jest.Mock) = jest.fn();
+      (prisma.document.create as jest.Mock) = jest.fn();
     });
 
-    it('should successfully generate graph and return 201', async () => {
-      // Arrange
-      const mockGraphResult = {
-        nodes: [
-          {
-            id: 'node-1',
-            title: 'Test Node 1',
-            description: 'Description 1',
-            nodeType: 'concept',
-            summary: 'Summary 1',
-            metadata: {},
+    // ============================================================
+    // MODE B: DIRECT TEXT TESTS (BACKWARD COMPATIBILITY)
+    // ============================================================
+
+    describe('Mode B: Direct text input (backward compatibility)', () => {
+      it('should successfully generate graph from documentText and return 201', async () => {
+        // Arrange
+        const mockGraphResult = {
+          nodes: [
+            {
+              id: 'node-1',
+              title: 'Test Node 1',
+              description: 'Description 1',
+              nodeType: 'concept',
+              summary: 'Summary 1',
+              metadata: {},
+            },
+            {
+              id: 'node-2',
+              title: 'Test Node 2',
+              description: 'Description 2',
+              nodeType: 'concept',
+              summary: 'Summary 2',
+              metadata: {},
+            },
+          ],
+          edges: [
+            {
+              from: 'node-1',
+              to: 'node-2',
+              relationship: 'relates to',
+              metadata: {},
+            },
+          ],
+          mermaidCode: 'graph TD\n  A[Node 1] --> B[Node 2]',
+          statistics: {
+            totalNodes: 2,
+            totalEdges: 1,
+            qualityScore: 85,
+            totalCost: 0.05,
+            processingTimeMs: 1500,
           },
-          {
-            id: 'node-2',
-            title: 'Test Node 2',
-            description: 'Description 2',
-            nodeType: 'concept',
-            summary: 'Summary 2',
-            metadata: {},
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            fallbackUsed: false,
+            warnings: [],
           },
-        ],
-        edges: [
-          {
-            from: 'node-1',
-            to: 'node-2',
-            relationship: 'relates to',
-            metadata: {},
+        };
+
+        const mockTempDocument = {
+          id: 'temp-doc-123',
+          title: 'Test Document',
+          contentText: validRequestBodyText.documentText,
+          sourceType: 'text',
+          status: 'ready',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const mockSavedGraph = {
+          id: 'graph-123',
+        };
+
+        (prisma.document.create as jest.Mock).mockResolvedValue(mockTempDocument);
+        mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
+        (prisma.$transaction as jest.Mock).mockResolvedValue(mockSavedGraph);
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert - Should create temporary document
+        expect(prisma.document.create).toHaveBeenCalledWith({
+          data: {
+            title: 'Test Document',
+            contentText: validRequestBodyText.documentText,
+            sourceType: 'text',
+            status: 'ready',
           },
-        ],
-        mermaidCode: 'graph TD\n  A[Node 1] --> B[Node 2]',
-        statistics: {
-          totalNodes: 2,
-          totalEdges: 1,
-          qualityScore: 85,
-          totalCost: 0.05,
-          processingTimeMs: 1500,
-        },
-        metadata: {
-          model: 'claude-sonnet-4-20250514',
-          fallbackUsed: false,
-          warnings: [],
-        },
-      };
+        });
 
-      const mockSavedGraph = {
-        id: 'graph-123',
-      };
+        // Assert - Should pass temp document ID to graph generator
+        expect(mockGraphGenerator.generateGraph).toHaveBeenCalledWith({
+          documentId: 'temp-doc-123',
+          documentText: validRequestBodyText.documentText,
+          documentTitle: 'Test Document',
+          options: {
+            maxNodes: 15,
+            skipCache: false,
+          },
+        });
 
-      mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
-      (prisma.$transaction as jest.Mock).mockResolvedValue(mockSavedGraph);
+        expect(prisma.$transaction).toHaveBeenCalled();
 
-      // Act
-      await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
-
-      // Assert
-      expect(mockGraphGenerator.generateGraph).toHaveBeenCalledWith({
-        documentId: 'test-request-123',
-        documentText: validRequestBody.documentText,
-        documentTitle: 'Test Document',
-        options: {
-          maxNodes: 15,
-          skipCache: false,
-        },
+        expect(mockResponse.status).toHaveBeenCalledWith(201);
+        expect(mockResponse.json).toHaveBeenCalledWith({
+          success: true,
+          data: {
+            graphId: 'graph-123',
+            status: 'completed',
+            nodeCount: 2,
+            edgeCount: 1,
+            qualityScore: 85,
+            cost: 0.05,
+            processingTimeMs: expect.any(Number),
+            warnings: [],
+          },
+          meta: expect.objectContaining({
+            timestamp: expect.any(String),
+            requestId: 'test-request-123',
+          }),
+        });
       });
 
-      expect(prisma.$transaction).toHaveBeenCalled();
+      it('should create temporary document when using documentText', async () => {
+        // Arrange
+        mockRequest.body = {
+          documentText: 'x'.repeat(200),
+          documentTitle: 'Temp Document',
+        };
 
-      expect(mockResponse.status).toHaveBeenCalledWith(201);
-      expect(mockResponse.json).toHaveBeenCalledWith({
-        success: true,
-        data: {
-          graphId: 'graph-123',
-          status: 'completed',
-          nodeCount: 2,
-          edgeCount: 1,
-          qualityScore: 85,
-          cost: 0.05,
-          processingTimeMs: expect.any(Number),
-          warnings: [],
-        },
-        meta: expect.objectContaining({
-          timestamp: expect.any(String),
-          requestId: 'test-request-123',
-        }),
+        const mockTempDocument = {
+          id: 'temp-doc-456',
+          title: 'Temp Document',
+          contentText: 'x'.repeat(200),
+          sourceType: 'text',
+          status: 'ready',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const mockGraphResult = {
+          nodes: [],
+          edges: [],
+          mermaidCode: '',
+          statistics: {
+            totalNodes: 0,
+            totalEdges: 0,
+            qualityScore: 0,
+            totalCost: 0,
+            processingTimeMs: 0,
+          },
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            fallbackUsed: false,
+            warnings: [],
+          },
+        };
+
+        (prisma.document.create as jest.Mock).mockResolvedValue(mockTempDocument);
+        mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
+        (prisma.$transaction as jest.Mock).mockResolvedValue({ id: 'graph-456' });
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert
+        expect(prisma.document.create).toHaveBeenCalled();
+        expect(mockGraphGenerator.generateGraph).toHaveBeenCalledWith(
+          expect.objectContaining({
+            documentId: 'temp-doc-456',
+            documentText: 'x'.repeat(200),
+          })
+        );
       });
     });
+
+    // ============================================================
+    // MODE A: DOCUMENT ID TESTS (NEW FUNCTIONALITY)
+    // ============================================================
+
+    describe('Mode A: Document ID lookup (new functionality)', () => {
+      it('should successfully generate graph from documentId', async () => {
+        // Arrange
+        mockRequest.body = {
+          documentId: 'existing-doc-123',
+          userId: 'user-456',
+          options: {
+            maxNodes: 20,
+            skipCache: false,
+          },
+        };
+
+        const mockExistingDocument = {
+          id: 'existing-doc-123',
+          title: 'Existing Document',
+          contentText: 'This is the content of an existing document from the database.',
+          sourceType: 'pdf',
+          status: 'ready',
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        };
+
+        const mockGraphResult = {
+          nodes: [
+            {
+              id: 'node-1',
+              title: 'Node from existing doc',
+              description: 'Description',
+              metadata: {},
+            },
+          ],
+          edges: [],
+          mermaidCode: 'graph TD\n  A[Node]',
+          statistics: {
+            totalNodes: 1,
+            totalEdges: 0,
+            qualityScore: 90,
+            totalCost: 0.03,
+            processingTimeMs: 1200,
+          },
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            fallbackUsed: false,
+            warnings: [],
+          },
+        };
+
+        const mockSavedGraph = {
+          id: 'graph-existing-123',
+        };
+
+        (prisma.document.findUnique as jest.Mock).mockResolvedValue(mockExistingDocument);
+        mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
+        (prisma.$transaction as jest.Mock).mockResolvedValue(mockSavedGraph);
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert - Should look up existing document
+        expect(prisma.document.findUnique).toHaveBeenCalledWith({
+          where: { id: 'existing-doc-123' },
+        });
+
+        // Assert - Should NOT create temporary document
+        expect(prisma.document.create).not.toHaveBeenCalled();
+
+        // Assert - Should use document's text and title
+        expect(mockGraphGenerator.generateGraph).toHaveBeenCalledWith({
+          documentId: 'existing-doc-123',
+          documentText: 'This is the content of an existing document from the database.',
+          documentTitle: 'Existing Document',
+          options: {
+            maxNodes: 20,
+            skipCache: false,
+          },
+        });
+
+        expect(mockResponse.status).toHaveBeenCalledWith(201);
+        expect(mockResponse.json).toHaveBeenCalledWith({
+          success: true,
+          data: {
+            graphId: 'graph-existing-123',
+            status: 'completed',
+            nodeCount: 1,
+            edgeCount: 0,
+            qualityScore: 90,
+            cost: 0.03,
+            processingTimeMs: expect.any(Number),
+            warnings: [],
+          },
+          meta: expect.any(Object),
+        });
+      });
+
+      it('should return 404 when document not found', async () => {
+        // Arrange
+        mockRequest.body = {
+          documentId: 'nonexistent-doc',
+        };
+
+        (prisma.document.findUnique as jest.Mock).mockResolvedValue(null);
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert
+        expect(mockResponse.status).toHaveBeenCalledWith(404);
+        expect(mockResponse.json).toHaveBeenCalledWith({
+          success: false,
+          error: {
+            code: 'DOCUMENT_NOT_FOUND',
+            message: "Document with ID 'nonexistent-doc' not found",
+          },
+          meta: expect.objectContaining({
+            requestId: 'test-request-123',
+          }),
+        });
+
+        expect(mockGraphGenerator.generateGraph).not.toHaveBeenCalled();
+      });
+
+      it('should return 400 when document is not ready', async () => {
+        // Arrange
+        mockRequest.body = {
+          documentId: 'processing-doc',
+        };
+
+        const mockProcessingDocument = {
+          id: 'processing-doc',
+          title: 'Processing Document',
+          contentText: '',
+          sourceType: 'pdf',
+          status: 'processing',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        (prisma.document.findUnique as jest.Mock).mockResolvedValue(mockProcessingDocument);
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert
+        expect(mockResponse.status).toHaveBeenCalledWith(400);
+        expect(mockResponse.json).toHaveBeenCalledWith({
+          success: false,
+          error: {
+            code: 'PROCESSING_FAILED',
+            message: 'Document is not ready. Current status: processing',
+          },
+          meta: expect.any(Object),
+        });
+
+        expect(mockGraphGenerator.generateGraph).not.toHaveBeenCalled();
+      });
+
+      it('should link graph to existing document (not create duplicate)', async () => {
+        // Arrange
+        mockRequest.body = {
+          documentId: 'existing-doc-789',
+        };
+
+        const mockExistingDocument = {
+          id: 'existing-doc-789',
+          title: 'Document 789',
+          contentText: 'Content here',
+          sourceType: 'text',
+          status: 'ready',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const mockGraphResult = {
+          nodes: [],
+          edges: [],
+          mermaidCode: '',
+          statistics: {
+            totalNodes: 0,
+            totalEdges: 0,
+            qualityScore: 0,
+            totalCost: 0,
+            processingTimeMs: 0,
+          },
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            fallbackUsed: false,
+            warnings: [],
+          },
+        };
+
+        (prisma.document.findUnique as jest.Mock).mockResolvedValue(mockExistingDocument);
+        mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
+        (prisma.$transaction as jest.Mock).mockResolvedValue({ id: 'graph-789' });
+
+        // Act
+        await generateGraph(mockRequest as Request, mockResponse as Response, mockNext);
+
+        // Assert - Should use existing document ID
+        expect(prisma.document.create).not.toHaveBeenCalled();
+        expect(mockGraphGenerator.generateGraph).toHaveBeenCalledWith(
+          expect.objectContaining({
+            documentId: 'existing-doc-789',
+          })
+        );
+      });
+    });
+
+    // ============================================================
+    // EXISTING TESTS (DEFAULT VALUES, ERRORS)
+    // ============================================================
 
     it('should use default document title if not provided', async () => {
       // Arrange
       mockRequest.body = {
-        ...validRequestBody,
+        ...validRequestBodyText,
         documentTitle: undefined,
+      };
+
+      const mockTempDocument = {
+        id: 'temp-doc-default',
+        title: 'Untitled Document',
+        contentText: validRequestBodyText.documentText,
+        sourceType: 'text',
+        status: 'ready',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       const mockGraphResult = {
@@ -201,6 +509,7 @@ describe('Graph Controller', () => {
         },
       };
 
+      (prisma.document.create as jest.Mock).mockResolvedValue(mockTempDocument);
       mockGraphGenerator.generateGraph.mockResolvedValue(mockGraphResult);
       (prisma.$transaction as jest.Mock).mockResolvedValue({ id: 'graph-123' });
 
@@ -218,9 +527,21 @@ describe('Graph Controller', () => {
     it('should use default maxNodes if not provided', async () => {
       // Arrange
       mockRequest.body = {
-        ...validRequestBody,
+        ...validRequestBodyText,
         options: undefined,
       };
+
+      const mockTempDocument = {
+        id: 'temp-doc-maxnodes',
+        title: 'Test Document',
+        contentText: validRequestBodyText.documentText,
+        sourceType: 'text',
+        status: 'ready',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (prisma.document.create as jest.Mock).mockResolvedValue(mockTempDocument);
 
       const mockGraphResult = {
         nodes: [],
