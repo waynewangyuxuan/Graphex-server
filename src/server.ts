@@ -3,14 +3,14 @@
  * Starts the Express server
  */
 
+// Load environment variables FIRST (before any other imports that use process.env)
+import './config/env';
+
 import { createApp } from './app';
 import { APP_CONFIG } from './config/constants';
 import { logger } from './utils/logger.util';
 import { closeRedisConnection } from './config/redis';
 import { prisma } from './config/database';
-
-// Load environment variables
-import './config/env';
 
 /**
  * Graceful shutdown handler

@@ -40,10 +40,37 @@ export const RATE_LIMITS = {
 } as const;
 
 /**
+ * Normalize a comma-separated string of origins into a clean array.
+ */
+const parseOrigins = (value?: string): string[] =>
+  value
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+
+/**
+ * Resolve allowed origins, supporting both the documented `CORS_ORIGINS`
+ * variable and the previously implemented `ALLOWED_ORIGINS`.
+ */
+const resolvedAllowedOrigins = (() => {
+  const fromAllowed = parseOrigins(process.env.ALLOWED_ORIGINS);
+  if (fromAllowed.length > 0) {
+    return fromAllowed;
+  }
+
+  const fromLegacy = parseOrigins(process.env.CORS_ORIGINS);
+  if (fromLegacy.length > 0) {
+    return fromLegacy;
+  }
+
+  return ['http://localhost:3001'];
+})();
+
+/**
  * CORS configuration
  */
 export const CORS_CONFIG = {
-  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'],
+  ALLOWED_ORIGINS: resolvedAllowedOrigins,
   CREDENTIALS: false,
 } as const;
 

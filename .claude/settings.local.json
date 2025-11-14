@@ -53,7 +53,8 @@
       "Bash(git push:*)",
       "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx prisma migrate:*)",
       "Bash(tee:*)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(.env)"
     ],
     "deny": [],
     "ask": []

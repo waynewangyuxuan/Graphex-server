@@ -581,7 +581,7 @@ Allowed origins (configured in `.env.development`):
 - `http://localhost:4000`
 - `http://localhost:5173` (Vite default)
 
-Add your frontend origin to `CORS_ORIGINS` in `.env.development`.
+Add your frontend origin to `ALLOWED_ORIGINS` in `.env.development` (the legacy `CORS_ORIGINS` key is still understood).
 
 ---
 
