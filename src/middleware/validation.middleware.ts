@@ -10,9 +10,16 @@ import { ExtendedRequest } from '../types/api.types';
 
 /**
  * Validate request against Zod schema
+ *
+ * WHY: Skip validation for OPTIONS preflight requests to allow CORS
  */
 export const validate = (schema: AnyZodObject) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Skip validation for OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     try {
       await schema.parseAsync({
         body: req.body,
