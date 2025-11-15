@@ -445,3 +445,160 @@ Following previous TODO plan with graph generation pipeline now fully operationa
 
 **Ready for**: Production testing with diverse documents, BullMQ integration
 
+---
+
+### Enhanced PDF Processing with Coordinate-Based References
+
+**Context**: Feature 2 (Integrated Reading Interface) from [PRODUCT.md](META/Core/PRODUCT.md:48-56) requires precise linking between graph nodes and specific regions in PDFs. Current text-only extraction loses visual/spatial context.
+
+**Problem**:
+- Basic text extraction (pdf-parse) produces plain strings
+- Loses formatting, layout, visual structure
+- Cannot highlight exact regions in original PDF
+- Users want to see the actual PDF, not reformatted text
+
+**Solution**: Coordinate-Based Extraction + PDF Rendering
+
+#### Phase 1: Enhanced Extraction with PDF.js
+- [ ] **Upgrade extraction to capture coordinates** (~3 hours)
+  - Use `pdfjs-dist` (already in stack) for coordinate extraction
+  - Extract text with bounding boxes: `{text, page, bbox: {x, y, width, height}}`
+  - Store in `documents.metadata` JSONB field as array of text blocks
+  - Maintain backward compatibility (still store full text in `content_text`)
+
+- [ ] **Update database schema** (~1 hour)
+  - Modify `nodes.document_refs` structure:
+    ```json
+    {
+      "references": [
+        {
+          "text": "quote from PDF",
+          "page": 5,
+          "bbox": {"x": 72, "y": 200, "width": 400, "height": 48}
+        }
+      ]
+    }
+    ```
+  - Add migration for schema update
+  - Document new structure in [TECHNICAL.md](META/Core/TECHNICAL.md)
+
+#### Phase 2: AI Prompt Enhancement
+- [ ] **Include page numbers in AI context** (~1 hour)
+  - Structure prompts with page markers: `PAGE 1:\n[content]\n\nPAGE 2:\n[content]`
+  - Instruct AI to include page references and key quotes in node output
+  - Update prompt templates in [prompt-templates.ts](src/lib/ai/prompt-templates.ts)
+
+- [ ] **Implement quote-to-coordinate matching** (~2 hours)
+  - After AI generates nodes with quotes, match to extracted coordinate data
+  - Use fuzzy matching for approximate text matches
+  - Handle multi-page references (same concept on pages 5, 12, 18)
+  - Store matched coordinates in `nodes.document_refs`
+
+#### Phase 3: Frontend Integration (Coordinate with Frontend Team)
+- [ ] **PDF rendering with PDF.js viewer**
+  - Render original PDF in side panel (preserves all formatting)
+  - Implement page navigation (scroll to specific page)
+
+- [ ] **Coordinate-based highlighting**
+  - On node click: highlight exact bounding box regions
+  - Draw semi-transparent yellow overlay on canvas
+  - Support multiple highlights per node (concept spans multiple locations)
+  - Add smooth scroll animation from graph node to PDF highlight
+
+#### Alternative Consideration: Advanced Extraction with pdfplumber
+- [ ] **Evaluate pdfplumber (Python microservice)** (Optional, post-MVP)
+  - Superior extraction: tables, images, complex layouts
+  - Would require Python service + API integration
+  - Use cases: scientific papers with tables/figures, technical documents
+  - Decision: Only if PDF.js proves insufficient for user needs
+
+#### Success Criteria
+- User clicks node → PDF scrolls to exact page and highlights correct region
+- Formatting preserved (users see original PDF, not extracted text)
+- Multi-page references work correctly (same concept on different pages)
+- Performance acceptable (coordinate extraction < 30s for 50-page PDF)
+
+#### Implementation Order (Following CLAUDE.md)
+1. **document-extraction-processor** agent: Coordinate extraction
+2. **prisma-database-architect** agent: Schema migration
+3. **ai-integration-specialist** agent: Prompt enhancement + matching algorithm
+4. Update [PROGRESS.md](META/PROGRESS.md) after each phase
+5. Coordinate with frontend team for PDF viewer integration
+
+**Priority**: Should Have (critical for Feature 2, but after MVP core functionality)
+
+**Estimated Effort**: 7-9 hours backend, ~5 hours frontend
+
+**Dependencies**:
+- Requires working document processing pipeline
+- Requires functional graph generation
+- Frontend PDF viewer component
+
+**Related Features** (from PRODUCT.md):
+- Feature 2: Integrated Reading Interface (primary use case)
+- Feature 6: Multi-Document Synthesis (coordinate tracking for multiple PDFs)
+- Feature 10: User Graph Customization (drag nodes, preserve PDF references)
+
+---
+
+### Critical UI/UX Fixes (Frontend Team - Immediate)
+
+**Context**: User feedback on current graph visualization - two critical usability issues.
+
+#### Fix 1: Edge Label Color
+- [ ] **Change edge label text color from white to dark charcoal** (~15 minutes)
+  - Current: White text on white background (unreadable)
+  - New: Dark charcoal (#333333) for readability
+  - Location: Graph edge label styling
+  - See: [UIUX.md](META/Core/UIUX.md:32) - "Edge Labels" specification
+
+#### Fix 2: Node Click Behavior Redesign
+- [ ] **Restructure node click interaction** (~2-3 hours)
+
+  **Current behavior** (remove):
+  - Clicking node opens modal/popup for notes
+
+  **New behavior** (implement):
+  1. **Reading panel interaction**:
+     - Smoothly scroll to corresponding text (800ms ease-in-out)
+     - Highlight text with warm amber background (#D4A574, 2s fade)
+     - Maintain highlight while note panel is open
+
+  2. **Note panel appearance**:
+     - **Position**: Fixed overlay at bottom-left corner
+     - **Dimensions**: ~300px width × 400px height
+     - **Spacing**: 16px from left edge, 16px from bottom edge
+     - **Animation**: Slide in from bottom-left (400ms ease-out)
+     - **Timing**: Appears simultaneously with click (no delay)
+     - **Z-index**: Above graph canvas, never blocks reading panel
+     - **Shadow**: 0 4px 12px rgba(0,0,0,0.15)
+
+  3. **Panel contents**:
+     - Header showing node title being annotated
+     - Auto-focus on note text area
+     - Auto-save indicator (top-right): "Saving..." → "Saved ✓"
+     - Close button (X) in header
+     - Optional: Resize handle at top-right corner
+
+  4. **Closing behavior**:
+     - Click close icon OR press ESC key
+     - Panel slides back down (400ms ease-in)
+     - Reading panel highlight fades out
+     - Node gains small amber dot indicator (bottom-right)
+
+**Visual References**:
+- Layout diagram: [UIUX.md](META/Core/UIUX.md:81-101)
+- Node click spec: [UIUX.md](META/Core/UIUX.md:119-128)
+- Note panel spec: [UIUX.md](META/Core/UIUX.md:161-183)
+
+**Success Criteria**:
+- Edge labels readable on white background
+- Click node → text highlights + scroll + note panel appears (all simultaneously)
+- Note panel doesn't block graph or reading content
+- Smooth animations (400ms slide, 800ms scroll, 2s highlight fade)
+- Natural workflow: read → click node → see context highlighted → take notes
+
+**Priority**: High - Critical usability issues affecting core interaction flow
+
+**Estimated Effort**: 2-3 hours (mostly repositioning note panel + scroll-to-text)
+

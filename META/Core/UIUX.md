@@ -19,16 +19,17 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 - **Secondary Accent**: Warm amber (#D4A574) - for highlights, adds warmth without childishness
 
 **Graph-Specific Colors**:
-- **Nodes**: 
+- **Nodes**:
   - Default: Soft slate blue (#7B92A8) with subtle gradient
   - With notes: Warm amber border (#D4A574)
   - Mastered (after quiz): Muted sage green (#8FA387)
   - Needs review: Soft terracotta (#C89B7B)
-- **Edges**: 
+- **Edges**:
   - Default: Medium gray (#A8A8A8), 2px width
   - Hover: Deep teal (#2C5F6F), 3px width
   - Strong relationship: Darker, thicker
   - Weak relationship: Lighter, thinner, dashed
+  - **Edge Labels**: Dark charcoal (#333333) - ensures readability on white background
 
 **Semantic Colors** (use sparingly):
 - Success/Correct: Muted sage (#8FA387) - not bright green
@@ -90,7 +91,13 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 │                      │                                  │
 │   [Zoom controls]    │    [Scroll indicator]            │
 │                      │                                  │
+│ ┌──────────────────┐ │                                  │
+│ │  NOTE PANEL      │ │                                  │ ← Appears on
+│ │  (fixed overlay) │ │                                  │   node click
+│ │  300×400px       │ │                                  │
+│ └──────────────────┘ │                                  │
 └──────────────────────┴──────────────────────────────────┘
+  ↑ Bottom-left corner
 ```
 
 **Responsive Breakpoints**:
@@ -118,8 +125,13 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 2. **Click**:
    - Node pulses once (scale 1.0 → 1.05 → 1.0, 300ms)
    - Reading panel smoothly scrolls to relevant section (800ms ease-in-out)
-   - Subtle highlight fades in around text (yellow, 2s fade)
-   - Clicked node gets subtle "active" border
+   - Corresponding text highlights with warm amber (#D4A574) background (2s fade)
+   - Clicked node gets subtle "active" border (teal)
+   - **Note panel slides in from bottom-left corner** (400ms ease-out)
+     - Position: Fixed at bottom-left, ~300px width × 400px height
+     - Does NOT overlay graph or reading panel (pushes content if needed)
+     - Appears simultaneously with click (no delay)
+     - Auto-focus on note text area
 
 3. **Right-Click (Context Menu)**:
    - "Add note"
@@ -153,19 +165,28 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 
 **Note-Taking Interactions**:
 1. **Opening Note Panel**:
-   - Slides in from right (400ms ease-out)
-   - Blurs graph slightly (focus on note)
+   - **Slides in from bottom-left corner** (400ms ease-out)
+   - **Position**: Fixed overlay at bottom-left
+     - Width: ~300px (comfortable for note-taking, not cramped)
+     - Height: ~400px (adjustable/resizable)
+     - Spacing: 16px from left edge, 16px from bottom
+     - Z-index: Above graph canvas but never blocks reading panel
+   - **Does NOT blur graph** - maintains focus on all three areas (graph, text, notes)
    - Autofocus on text area
+   - **Header**: Shows node title being annotated
+   - **Shadow**: Soft drop shadow to lift from canvas (0 4px 12px rgba(0,0,0,0.15))
 
 2. **While Typing**:
-   - Auto-save indicator: "Saving..." → "Saved ✓" (subtle, top-right)
+   - Auto-save indicator: "Saving..." → "Saved ✓" (subtle, top-right of note panel)
    - No disruptive save buttons
    - Word count shows if approaching limit
+   - Resize handle at top-right corner (optional)
 
 3. **Closing**:
-   - Click outside or ESC key
-   - Panel slides away
-   - Node gains visual indicator (small amber dot)
+   - Click close icon (X) in note panel header or ESC key
+   - Panel slides back down to bottom-left (400ms ease-in)
+   - Node gains visual indicator (small amber dot on bottom-right)
+   - Reading panel highlight fades out if present
 
 **Comprehension Check**:
 1. **Trigger**:

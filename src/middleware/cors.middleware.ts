@@ -22,7 +22,7 @@ const corsOptions: CorsOptions = {
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   credentials: CORS_CONFIG.CREDENTIALS,
   maxAge: 86400, // 24 hours
 };
