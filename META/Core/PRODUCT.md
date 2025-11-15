@@ -1,8 +1,12 @@
-# Motivation
+# Graphex Product Vision
+
+## Motivation
 
 Information consumption is evolving beyond traditional linear reading. AI enables knowledge to be **dynamic** (expand, summarize, and generate examples on demand), **flexible** (reveal inter-relationships across multiple sources), and **accessible** (restructure content to match individual learning needs).
 
 For knowledge-oriented reading—as opposed to literary or aesthetic reading—AI can transform the consumption process into a structured, active learning experience. Rather than replacing reading, AI can scaffold deeper comprehension and synthesis.
+
+Graphex brings this vision to life through an interactive knowledge graph learning canvas.
 
 # Problem
 

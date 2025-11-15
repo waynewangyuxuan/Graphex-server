@@ -1,8 +1,8 @@
-# Frontend Integration Guide
+# Graphex Frontend Integration Guide
 
 ## Server Status: ✅ READY FOR FRONTEND
 
-Your backend is fully functional and ready to be wired to your frontend. Here's what you need to know:
+Your Graphex backend is fully functional and ready to be wired to your frontend. Here's what you need to know:
 
 ---
 

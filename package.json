@@ -1,7 +1,7 @@
 {
   "name": "graphex-server",
   "version": "1.0.0",
-  "description": "Knowledge Graph Learning Platform - Backend System",
+  "description": "Graphex - Knowledge Graph Learning Platform Backend",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

@@ -1,6 +1,6 @@
 # Server-Side Technical Design Document
 
-## Knowledge Graph Learning Platform - Backend System
+## Graphex - Knowledge Graph Learning Platform Backend
 
 **Version:** 1.0  
 **Last Updated:** November 11, 2025  

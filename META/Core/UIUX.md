@@ -1,10 +1,10 @@
-# UI/UX Design Vision: Knowledge Graph Learning Canvas
+# UI/UX Design Vision: Graphex Knowledge Graph Learning Canvas
 
 ## Design Philosophy
 
 **Core Principle**: *Calm Clarity with Purposeful Engagement*
 
-This is a **thinking tool**, not entertainment. The aesthetic should evoke the feeling of a well-organized workspace—focused, intentional, with everything having its place. Think: architect's desk, scientist's notebook, philosopher's study.
+Graphex is a **thinking tool**, not entertainment. The aesthetic should evoke the feeling of a well-organized workspace—focused, intentional, with everything having its place. Think: architect's desk, scientist's notebook, philosopher's study.
 
 ---
 
@@ -13,7 +13,7 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 ### Color Palette: "Intellectual Serenity"
 
 **Primary Colors**:
-- **Background**: Warm off-white (#F8F7F4) - easier on eyes than pure white, suggests paper
+- **Background**: Warm beige (#EAE4D9) - matches Graphex logo, warm and inviting, suggests paper
 - **Graph Canvas**: Slightly darker warm gray (#EEECE8) - subtle differentiation from background
 - **Primary Accent**: Deep teal (#2C5F6F) - serious, contemplative, not distracting
 - **Secondary Accent**: Warm amber (#D4A574) - for highlights, adds warmth without childishness
@@ -80,7 +80,7 @@ This is a **thinking tool**, not entertainment. The aesthetic should evoke the f
 **Layout Structure**:
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  [Logo]  Document Title            [Help] [Settings]    │ ← 64px header
+│  [Graphex]  Document Title         [Help] [Settings]    │ ← 64px header
 ├──────────────────────┬──────────────────────────────────┤
 │                      │                                  │
 │   GRAPH CANVAS       │    READING PANEL                 │
