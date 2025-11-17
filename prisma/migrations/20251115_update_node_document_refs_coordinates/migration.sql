@@ -1,0 +1,46 @@
+-- Update nodes.document_refs to support coordinate-based references
+--
+-- CONTEXT:
+-- Phase 1 (completed): documents.metadata stores textBlocks with PDF coordinates
+-- Phase 2 (this migration): nodes.document_refs will store coordinate-based references
+-- Phase 3 (future): Frontend highlights precise regions using these coordinates
+--
+-- NEW STRUCTURE:
+-- {
+--   "references": [
+--     {
+--       "text": "Photosynthesis is the process...",
+--       "page": 5,
+--       "bbox": {
+--         "x": 72,
+--         "y": 650,
+--         "width": 400,
+--         "height": 48
+--       }
+--     }
+--   ]
+-- }
+--
+-- BENEFITS:
+-- - Supports MULTIPLE references per node (same concept on different pages)
+-- - Each reference has precise bounding box for frontend highlighting
+-- - Backward compatible: NULL documentRefs still work
+-- - Queryable: Can search nodes by page, text, or coordinate ranges
+--
+-- COORDINATE SYSTEM:
+-- PDF coordinates with origin at bottom-left:
+-- - x: Distance from left edge (PDF points, 1pt = 1/72 inch)
+-- - y: Distance from bottom edge (NOT top!)
+-- - width, height: Dimensions in PDF points
+
+-- Add documentation comment explaining the new structure
+COMMENT ON COLUMN "nodes"."document_refs" IS 'JSONB field storing array of document references with coordinates. Structure: {references: [{text: string, page: number, bbox: {x, y, width, height}}]}. Enables precise text highlighting in frontend by providing bounding box coordinates from source PDF.';
+
+-- Optional: Add GIN index for efficient JSONB queries
+-- Uncomment if you need to query nodes by page number or text content frequently
+-- CREATE INDEX IF NOT EXISTS "idx_nodes_document_refs_gin" ON "nodes" USING GIN ("document_refs");
+
+-- No data migration needed:
+-- - Existing NULL values remain NULL (will be populated when regenerating graphs)
+-- - Existing documentRefs (if any) remain unchanged (backward compatible)
+-- - New graphs will use coordinate-based format

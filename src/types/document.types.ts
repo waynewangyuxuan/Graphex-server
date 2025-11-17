@@ -71,6 +71,7 @@ export interface ProcessedDocument {
   fileSize?: number;
   quality: DocumentQuality;
   metadata: DocumentMetadata;
+  textBlocks?: any[]; // PDF text blocks with coordinates (stored in metadata JSONB)
 }
 
 /**

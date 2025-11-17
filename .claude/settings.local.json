@@ -54,7 +54,15 @@
       "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx prisma migrate:*)",
       "Bash(tee:*)",
       "Bash(npm run type-check:*)",
-      "Bash(.env)"
+      "Bash(.env)",
+      "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx tsx:*)",
+      "Bash(pkill:*)",
+      "Bash(npm run integration-test:*)",
+      "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx prisma migrate deploy:*)",
+      "Bash(python3:*)",
+      "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx prisma generate:*)",
+      "Bash(then grep DATABASE_URL .env)",
+      "Bash(else echo \".env file not found\")"
     ],
     "deny": [],
     "ask": []

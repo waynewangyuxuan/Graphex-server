@@ -508,10 +508,54 @@ export class SemanticNodeDeduplicator {
    * Build final deduplicated result
    */
   private buildResult(
-    nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>,
+    nodes: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      nodeType?: string;
+      summary?: string;
+      pageReferences?: number[];
+      keyQuote?: string;
+      documentRefs?: {
+        references: Array<{
+          text: string;
+          page?: number;
+          pages?: number[];
+          bbox?: any;
+          coordinates?: any;
+        }>;
+      };
+      sourceChunk?: {
+        chunkIndex: number;
+        textBlockRange: { start: number; end: number };
+      };
+      metadata?: Record<string, unknown>;
+    }>,
     uf: UnionFind,
   ): {
-    deduplicatedNodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
+    deduplicatedNodes: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      nodeType?: string;
+      summary?: string;
+      pageReferences?: number[];
+      keyQuote?: string;
+      documentRefs?: {
+        references: Array<{
+          text: string;
+          page?: number;
+          pages?: number[];
+          bbox?: any;
+          coordinates?: any;
+        }>;
+      };
+      sourceChunk?: {
+        chunkIndex: number;
+        textBlockRange: { start: number; end: number };
+      };
+      metadata?: Record<string, unknown>;
+    }>;
     mapping: Record<string, string>;
   } {
     const groups = uf.getGroups();
@@ -521,6 +565,22 @@ export class SemanticNodeDeduplicator {
       description?: string;
       nodeType?: string;
       summary?: string;
+      pageReferences?: number[];
+      keyQuote?: string;
+      documentRefs?: {
+        references: Array<{
+          text: string;
+          page?: number;
+          pages?: number[];
+          bbox?: any;
+          coordinates?: any;
+        }>;
+      };
+      sourceChunk?: {
+        chunkIndex: number;
+        textBlockRange: { start: number; end: number };
+      };
+      metadata?: Record<string, unknown>;
     }> = [];
     const mapping: Record<string, string> = {};
 
@@ -538,6 +598,11 @@ export class SemanticNodeDeduplicator {
         description: representative.description,
         nodeType: representative.nodeType, // Preserve semantic classification
         summary: representative.summary, // Preserve contextual summary
+        pageReferences: representative.pageReferences, // Preserve page references
+        keyQuote: representative.keyQuote, // Preserve key quote
+        documentRefs: representative.documentRefs, // Preserve document references
+        sourceChunk: representative.sourceChunk, // Preserve source chunk metadata
+        metadata: representative.metadata, // Preserve additional metadata
       });
 
       // Map all members to root
@@ -553,8 +618,52 @@ export class SemanticNodeDeduplicator {
    * Choose best node from a group (most informative)
    */
   private chooseBestNode(
-    nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>,
-  ): { id: string; title: string; description?: string; nodeType?: string; summary?: string } {
+    nodes: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      nodeType?: string;
+      summary?: string;
+      pageReferences?: number[];
+      keyQuote?: string;
+      documentRefs?: {
+        references: Array<{
+          text: string;
+          page?: number;
+          pages?: number[];
+          bbox?: any;
+          coordinates?: any;
+        }>;
+      };
+      sourceChunk?: {
+        chunkIndex: number;
+        textBlockRange: { start: number; end: number };
+      };
+      metadata?: Record<string, unknown>;
+    }>,
+  ): {
+    id: string;
+    title: string;
+    description?: string;
+    nodeType?: string;
+    summary?: string;
+    pageReferences?: number[];
+    keyQuote?: string;
+    documentRefs?: {
+      references: Array<{
+        text: string;
+        page?: number;
+        pages?: number[];
+        bbox?: any;
+        coordinates?: any;
+      }>;
+    };
+    sourceChunk?: {
+      chunkIndex: number;
+      textBlockRange: { start: number; end: number };
+    };
+    metadata?: Record<string, unknown>;
+  } {
     return nodes.reduce((best, current) => {
       const bestScore = this.nodeQualityScore(best);
       const currentScore = this.nodeQualityScore(current);

@@ -38,6 +38,8 @@ Title: {{documentTitle}}
 Content:
 {{documentText}}
 
+IMPORTANT: The document content above includes PAGE markers (e.g., "PAGE 0:", "PAGE 1:", etc.) indicating page boundaries. Use these markers to identify which page each concept appears on.
+
 ## Requirements
 
 ### Concept Selection (7-15 nodes)
@@ -111,8 +113,10 @@ Each relationship should help learners understand how concepts interact
 
 ### Source Grounding (CRITICAL)
 - ONLY extract concepts that are explicitly discussed in the document
-- For each node, provide direct quotes from the source text
-- Include character positions (start, end) for each reference
+- For each node, you MUST provide:
+  1. **pageReferences**: Array of page numbers where this concept appears (0-indexed)
+  2. **keyQuote**: A representative quote from the document (15-30 words) that best describes this concept
+- The keyQuote must be a verbatim excerpt from the document text
 - If uncertain about a concept, prefer omitting it over hallucinating
 
 ### Output Format
@@ -127,15 +131,9 @@ Return a JSON object with this EXACT structure:
       "nodeType": "concept",
       "summary": "A clear 2-sentence summary explaining what this concept is and its role in the document context. This should be understandable on its own.",
       "description": "Brief 1-2 sentence description from the document",
-      "metadata": {
-        "documentRefs": [
-          {
-            "start": 150,
-            "end": 320,
-            "text": "exact quote from document mentioning this concept"
-          }
-        ]
-      }
+      "pageReferences": [0, 2],
+      "keyQuote": "Exact verbatim quote from the document (15-30 words) that best describes this concept",
+      "metadata": {}
     }
   ],
   "edges": [
@@ -155,7 +153,8 @@ Return a JSON object with this EXACT structure:
 - Each node MUST have unique id (A, B, C, etc.)
 - Each node MUST have a valid nodeType from the taxonomy above
 - Each node MUST have a 2-sentence summary
-- Each node MUST have at least one documentRef in metadata
+- Each node MUST have pageReferences array (at least one page number)
+- Each node MUST have a keyQuote (15-30 words, verbatim from document)
 - Mermaid syntax must be valid (test it mentally)
 - All node IDs referenced in edges must exist in nodes array
 - Use fromNodeId and toNodeId fields for edges (not "from" and "to")
@@ -166,7 +165,9 @@ Return a JSON object with this EXACT structure:
 - Do NOT invent concepts not in the document
 - Do NOT add your own knowledge or common sense beyond what's stated
 - If unsure, prefer fewer high-quality nodes over many low-quality ones
-- All snippets and documentRefs must be verbatim from source text
+- All keyQuotes must be verbatim excerpts from source text (no paraphrasing)
+- pageReferences must accurately reflect the PAGE markers in the document
+- If a concept appears on multiple pages, include all page numbers in pageReferences
 
 IMPORTANT: Return ONLY the JSON object, no explanations or commentary.
 

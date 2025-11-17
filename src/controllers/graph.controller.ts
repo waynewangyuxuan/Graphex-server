@@ -81,6 +81,67 @@ export const generateGraph = async (
       finalDocumentText = document.contentText;
       finalDocumentTitle = document.title;
       finalDocumentId = document.id;
+
+      // Extract textBlocks from metadata if available
+      let textBlocks: any[] | undefined;
+      if (document.metadata && typeof document.metadata === 'object') {
+        const metadata = document.metadata as any;
+        if (Array.isArray(metadata.textBlocks)) {
+          textBlocks = metadata.textBlocks;
+          logger.info('Found textBlocks in document metadata', {
+            requestId: extReq.requestId,
+            documentId,
+            textBlockCount: textBlocks?.length || 0,
+          });
+        }
+      }
+
+      // Call Graph Generator Service with textBlocks
+      const graphGenerator = services.getGraphGenerator();
+
+      const result = await graphGenerator.generateGraph({
+        documentId: finalDocumentId,
+        documentText: finalDocumentText,
+        documentTitle: finalDocumentTitle,
+        textBlocks, // Pass textBlocks for coordinate matching
+        options: {
+          maxNodes: options?.maxNodes || 15,
+          skipCache: options?.skipCache || false,
+        },
+      });
+
+      logger.info('Graph generation completed', {
+        requestId: extReq.requestId,
+        nodeCount: result.statistics.totalNodes,
+        edgeCount: result.statistics.totalEdges,
+        cost: result.statistics.totalCost,
+        durationMs: Date.now() - startTime,
+      });
+
+      // Save to database (link to existing document)
+      const savedGraph = await saveGraphToDatabase(
+        result,
+        finalDocumentId,
+        userId
+      );
+
+      // Return response
+      sendSuccess(
+        res,
+        {
+          graphId: savedGraph.id,
+          status: 'completed',
+          nodeCount: result.statistics.totalNodes,
+          edgeCount: result.statistics.totalEdges,
+          qualityScore: result.statistics.qualityScore,
+          cost: result.statistics.totalCost,
+          processingTimeMs: result.statistics.processingTimeMs,
+          warnings: result.metadata.warnings,
+        },
+        201,
+        extReq.requestId
+      );
+      return; // Early return for Mode A
     } else {
       // Mode B: Direct text (backward compatibility)
       finalDocumentText = documentText!; // Non-null assertion safe due to Zod validation
@@ -112,7 +173,7 @@ export const generateGraph = async (
       maxNodes: options?.maxNodes,
     });
 
-    // Call Graph Generator Service
+    // Call Graph Generator Service (Mode B - no textBlocks)
     const graphGenerator = services.getGraphGenerator();
 
     const result = await graphGenerator.generateGraph({
@@ -375,7 +436,13 @@ async function saveGraphToDatabase(
       description?: string;
       nodeType?: string;
       summary?: string;
-      sourceChunk?: number;
+      pageReferences?: number[];
+      keyQuote?: string;
+      documentRefs?: { references: Array<any> };
+      sourceChunk?: {
+        chunkIndex: number;
+        textBlockRange: { start: number; end: number };
+      };
       metadata?: Record<string, unknown>;
     }>;
     edges: Array<{
@@ -417,6 +484,8 @@ async function saveGraphToDatabase(
 
     // 3. Create all nodes
     for (const node of graphResult.nodes) {
+      const nodeWithDocRefs = node as any; // Cast to access documentRefs
+
       const createdNode = await tx.node.create({
         data: {
           graphId: graph.id,
@@ -425,7 +494,7 @@ async function saveGraphToDatabase(
           contentSnippet: node.description,
           nodeType: node.nodeType,
           summary: node.summary,
-          documentRefs: (node.metadata?.documentRefs as Prisma.InputJsonValue) || Prisma.JsonNull,
+          documentRefs: (nodeWithDocRefs.documentRefs as Prisma.InputJsonValue) || Prisma.JsonNull,
           metadata: (node.metadata as Prisma.InputJsonValue) || Prisma.JsonNull,
         },
       });

@@ -268,9 +268,41 @@ documents
 ├── file_size (Integer)              # In bytes
 ├── status (Enum)                    # processing | ready | failed
 ├── error_message (Text, nullable)
+├── metadata (JSONB)                 # Enhanced metadata (v2.0)
+│                                    # Stores: textBlocks with coordinates, pageCount, etc.
 ├── created_at (DateTime)
 └── updated_at (DateTime)
 ```
+
+**Document Metadata Structure (v2.0 - Coordinate-Based):**
+
+Documents now store extracted text with precise coordinates for enabling node highlighting:
+
+```typescript
+// documents.metadata JSONB field
+{
+  "textBlocks": [                    // Array of text blocks with coordinates
+    {
+      "text": "Photosynthesis is the process by which plants...",
+      "page": 0,                     // 0-indexed page number
+      "bbox": {
+        "x": 72,                     // PDF points from left edge
+        "y": 650,                    // PDF points from bottom edge
+        "width": 400,
+        "height": 48
+      }
+    },
+    // ... more text blocks
+  ],
+  "pageCount": 10,
+  "wordCount": 5432,
+  "imageCount": 3,
+  "extractionTime": 2500,            // Milliseconds
+  "warnings": []
+}
+```
+
+This provides the foundation for Phase 2 (node coordinate references).
 
 #### Graphs Table
 ```
@@ -292,12 +324,56 @@ nodes
 ├── graph_id (UUID, FK → graphs)
 ├── node_key (String)                # e.g., "A", "concept1"
 ├── title (String)                   # Node display label
-├── content_snippet (Text)           # Brief description
-├── document_refs (JSONB)            # [{start, end, text}] - references to source
+├── content_snippet (Text)           # Brief description (legacy)
+├── node_type (String)               # concept | fact | method | etc.
+├── summary (Text)                   # 2-sentence contextual summary
+├── document_refs (JSONB)            # Coordinate-based references (v2.0)
+│                                    # Structure: {references: [{text, page, bbox}]}
+│                                    # Enables precise PDF highlighting in frontend
 ├── position_x (Float, nullable)     # For future drag-drop
 ├── position_y (Float, nullable)
 └── metadata (JSONB)                 # Color, importance, etc.
 ```
+
+**Document References Structure (v2.0 - Coordinate-Based):**
+
+Nodes now store coordinate-based references to source documents, enabling precise highlighting in the frontend:
+
+```typescript
+// nodes.document_refs JSONB field
+{
+  "references": [
+    {
+      "text": "Photosynthesis is the process by which plants...",
+      "page": 5,                    // 0-indexed page number
+      "bbox": {
+        "x": 72,                    // Left position (PDF points from left edge)
+        "y": 650,                   // Bottom position (PDF points from bottom!)
+        "width": 400,               // Width in PDF points
+        "height": 48                // Height in PDF points
+      }
+    },
+    {
+      "text": "Chlorophyll absorbs light energy...",
+      "page": 6,
+      "bbox": { "x": 72, "y": 500, "width": 350, "height": 36 }
+    }
+  ]
+}
+```
+
+**Key Features:**
+- **Multiple references per node:** Same concept can appear on different pages
+- **Precise coordinates:** Bounding boxes enable pixel-perfect highlighting
+- **PDF coordinate system:** Origin at bottom-left (not top-left like web!)
+- **Backward compatible:** NULL or legacy formats still supported
+
+**Architecture Flow:**
+1. **Phase 1:** Extract PDF with coordinates → `documents.metadata.textBlocks`
+2. **Phase 2:** AI generates nodes → Match snippets to textBlocks → Store in `nodes.documentRefs`
+3. **Phase 3:** Frontend highlights precise regions using bbox coordinates
+
+See `docs/NODE_COORDINATE_REFERENCES.md` for complete usage guide.
 
 #### Edges Table
 ```

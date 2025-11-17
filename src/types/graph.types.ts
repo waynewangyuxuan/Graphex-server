@@ -197,16 +197,60 @@ export interface GraphData {
  * Input for node deduplication
  */
 export interface DeduplicationInput {
-  /** Nodes to deduplicate */
-  nodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
+  /** Nodes to deduplicate - preserves all fields during deduplication */
+  nodes: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    nodeType?: string;
+    summary?: string;
+    pageReferences?: number[];
+    keyQuote?: string;
+    documentRefs?: {
+      references: Array<{
+        text: string;
+        page?: number;
+        pages?: number[];
+        bbox?: any;
+        coordinates?: any;
+      }>;
+    };
+    sourceChunk?: {
+      chunkIndex: number;
+      textBlockRange: { start: number; end: number };
+    };
+    metadata?: Record<string, unknown>;
+  }>;
 }
 
 /**
  * Result of node deduplication
  */
 export interface DeduplicationResult {
-  /** Deduplicated nodes (merged) */
-  deduplicatedNodes: Array<{ id: string; title: string; description?: string; nodeType?: string; summary?: string }>;
+  /** Deduplicated nodes (merged) - preserves all fields from best representative */
+  deduplicatedNodes: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    nodeType?: string;
+    summary?: string;
+    pageReferences?: number[];
+    keyQuote?: string;
+    documentRefs?: {
+      references: Array<{
+        text: string;
+        page?: number;
+        pages?: number[];
+        bbox?: any;
+        coordinates?: any;
+      }>;
+    };
+    sourceChunk?: {
+      chunkIndex: number;
+      textBlockRange: { start: number; end: number };
+    };
+    metadata?: Record<string, unknown>;
+  }>;
 
   /** Mapping from old node IDs to new node IDs */
   mapping: Record<string, string>;

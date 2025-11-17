@@ -67,7 +67,13 @@ export const uploadDocument = async (
       maxCost: 5.0, // $5 max
     });
 
-    // Save to database
+    // Sanitize textBlocks to remove null bytes before storing in JSONB
+    const sanitizedTextBlocks = processedDoc.textBlocks?.map((block: any) => ({
+      ...block,
+      text: block.text ? block.text.replace(/\x00/g, '').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') : '',
+    })) || [];
+
+    // Save to database with metadata including textBlocks for coordinate references
     const document = await prisma.document.create({
       data: {
         title: req.body.title || processedDoc.title,
@@ -76,6 +82,10 @@ export const uploadDocument = async (
         filePath: processedDoc.filePath,
         fileSize: processedDoc.fileSize,
         status: 'ready',
+        metadata: {
+          ...processedDoc.metadata,
+          textBlocks: sanitizedTextBlocks, // Include coordinate data for graph nodes (sanitized)
+        },
       },
     });
 

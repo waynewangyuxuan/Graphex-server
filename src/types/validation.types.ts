@@ -205,6 +205,8 @@ export interface AIGraphOutput {
     description?: string;
     nodeType?: string; // Semantic classification (concept, fact, argument, etc.)
     summary?: string; // 2-sentence contextual summary
+    pageReferences?: number[]; // Pages where this concept appears (0-indexed)
+    keyQuote?: string; // Representative quote from document (15-30 words)
     metadata?: Record<string, unknown>;
   }>;
 

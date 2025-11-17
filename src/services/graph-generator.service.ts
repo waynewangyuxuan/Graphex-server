@@ -31,6 +31,10 @@ import { CostTrackerService } from './cost-tracker.service';
 import { AIGraphOutput } from '../types/validation.types';
 import { ChunkingResult, TextChunk } from '../types/chunking.types';
 import { SemanticNodeDeduplicator } from '../lib/graph/semantic-deduplicator';
+import { formatTextWithPageMarkers } from '../lib/pdf/page-marker-formatter';
+import { matchQuoteToCoordinates, calculateMatchingMetrics, QuoteMatchResult } from '../lib/pdf/quote-matcher';
+import { TextBlock } from '../types/pdf.types';
+import { createNodeDocumentRefs } from '../types/node.types';
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -43,6 +47,7 @@ export interface GenerateGraphRequest {
   documentId: string;
   documentText: string;
   documentTitle: string;
+  textBlocks?: TextBlock[]; // PDF text blocks with coordinates (for coordinate matching)
   options?: {
     maxNodes?: number; // Default: 15
     skipCache?: boolean;
@@ -67,7 +72,24 @@ export interface GraphNode {
   description?: string;
   nodeType?: string; // Semantic classification (concept, fact, argument, etc.)
   summary?: string; // 2-sentence contextual summary
-  sourceChunk?: number; // Which chunk this came from
+  pageReferences?: number[]; // Pages where concept appears (from AI)
+  keyQuote?: string; // Representative quote (from AI)
+  documentRefs?: {
+    references: Array<{
+      text: string;
+      page?: number; // For single-page references
+      pages?: number[]; // For cross-page references
+      bbox?: any; // For single-page references (deprecated, use coordinates)
+      coordinates?: any; // For both single and cross-page references
+    }>;
+  }; // Coordinate-based references (smart matching)
+  sourceChunk?: {
+    chunkIndex: number;
+    textBlockRange: {
+      start: number; // Index into textBlocks array
+      end: number; // Index into textBlocks array (exclusive)
+    };
+  }; // Which chunk this came from and its textBlock range
   metadata?: Record<string, unknown>;
 }
 
@@ -104,6 +126,17 @@ export interface GraphStatistics {
   qualityScore: number; // 0-100
   totalCost: number; // USD
   processingTimeMs: number;
+  // Quote matching statistics
+  quoteMatching?: {
+    totalQuotes: number;
+    exactMatchRate: number; // Percentage
+    normalizedMatchRate: number;
+    tokenBasedMatchRate: number;
+    fuzzyMatchRate: number;
+    failedMatchRate: number;
+    averageConfidence: number;
+    averageBlocksPerQuote: number;
+  };
 }
 
 /**
@@ -226,7 +259,33 @@ export class GraphGeneratorService {
         available: costEstimate.budgetCheck.available,
       });
 
-      // Step 2: Chunk document
+      // Step 2: Format text with page markers (if textBlocks provided)
+      let formattedText = request.documentText;
+      if (request.textBlocks && request.textBlocks.length > 0) {
+        this.logger.info('Formatting text with page markers', {
+          textBlocks: request.textBlocks.length,
+        });
+
+        const formatResult = formatTextWithPageMarkers(
+          request.documentText,
+          request.textBlocks,
+          { includeMarkers: true },
+          this.logger,
+        );
+
+        formattedText = formatResult.formattedText;
+
+        this.logger.info('Page marker formatting complete', {
+          totalPages: formatResult.metadata.totalPages,
+          totalBlocks: formatResult.metadata.totalBlocks,
+          averageBlocksPerPage: formatResult.metadata.averageBlocksPerPage,
+          emptyPages: formatResult.metadata.emptyPages.length,
+        });
+      } else {
+        this.logger.warn('No text blocks provided - skipping page marker formatting');
+      }
+
+      // Step 3: Chunk document
       this.reportProgress(progressCallback, {
         stage: 'chunking',
         chunksProcessed: 0,
@@ -235,13 +294,23 @@ export class GraphGeneratorService {
         message: 'Chunking document...',
       });
 
-      const chunkingResult = await this.chunkDocument(request.documentText, request.documentTitle);
+      const chunkingResult = await this.chunkDocument(formattedText, request.documentTitle);
       const chunks = chunkingResult.chunks;
 
       this.logger.info('Document chunked', {
         totalChunks: chunks.length,
         avgChunkSize: chunkingResult.statistics.averageChunkSize,
         qualityScore: chunkingResult.statistics.qualityScore,
+      });
+
+      // Compute textBlock ranges for each chunk (needed for smart quote matching)
+      const textBlockRanges = request.textBlocks
+        ? this.computeTextBlockRanges(chunks, request.textBlocks)
+        : new Map<number, { start: number; end: number }>();
+
+      this.logger.info('Computed textBlock ranges for chunks', {
+        totalChunks: chunks.length,
+        rangesComputed: textBlockRanges.size,
       });
 
       // Step 3: Generate mini-graphs for each chunk (BATCHED)
@@ -269,9 +338,38 @@ export class GraphGeneratorService {
         message: 'Merging mini-graphs with correct node/edge handling...',
       });
 
-      const merged = await this.mergeGraphsCorrectly(miniGraphs, maxNodes);
+      const merged = await this.mergeGraphsCorrectly(miniGraphs, maxNodes, textBlockRanges);
 
-      // Step 5: Validate final graph
+      // Step 5: Smart quote matching with hybrid strategy (exact + semantic)
+      let matchingMetrics: any | undefined;
+      if (request.textBlocks && request.textBlocks.length > 0) {
+        this.reportProgress(progressCallback, {
+          stage: 'validating',
+          chunksProcessed: chunks.length,
+          totalChunks: chunks.length,
+          percentComplete: 85,
+          message: 'Matching quotes to PDF coordinates (smart hybrid matching)...',
+        });
+
+        const matchingResult = await this.smartMatchQuotesToCoordinates(
+          merged.nodes,
+          request.textBlocks,
+        );
+
+        merged.nodes = matchingResult.nodes;
+        matchingMetrics = matchingResult.metrics;
+
+        this.logger.info('Smart quote matching complete', {
+          totalNodes: matchingMetrics.totalNodes,
+          nodesWithRefs: matchingMetrics.nodesWithRefs,
+          exactMatchStrategy: matchingMetrics.exactMatchCount,
+          semanticSearchStrategy: matchingMetrics.semanticSearchCount,
+          fallbackStrategy: matchingMetrics.fallbackCount,
+          averageSimilarity: matchingMetrics.averageSimilarity.toFixed(2),
+        });
+      }
+
+      // Step 6: Validate final graph
       this.reportProgress(progressCallback, {
         stage: 'validating',
         chunksProcessed: chunks.length,
@@ -300,6 +398,7 @@ export class GraphGeneratorService {
           qualityScore: validated.qualityScore,
           totalCost: validated.totalCost,
           processingTimeMs: processingTime,
+          quoteMatching: matchingMetrics,
         },
         metadata: {
           model: validated.model,
@@ -517,6 +616,20 @@ export class GraphGeneratorService {
         },
       });
 
+      // DEBUG: Log AI response to verify keyQuote presence
+      this.logger.info('[DEBUG] AI Response for chunk', {
+        chunkIndex: chunk.chunkIndex,
+        nodeCount: response.data.nodes?.length || 0,
+        sampleNode: response.data.nodes?.[0] ? {
+          id: response.data.nodes[0].id,
+          title: response.data.nodes[0].title,
+          hasKeyQuote: !!response.data.nodes[0].keyQuote,
+          hasPageReferences: !!response.data.nodes[0].pageReferences,
+          keyQuote: response.data.nodes[0].keyQuote?.substring(0, 50),
+          pageReferences: response.data.nodes[0].pageReferences,
+        } : null,
+      });
+
       return response.data;
     } catch (error) {
       this.logger.error('Failed to generate mini-graph for chunk', {
@@ -548,6 +661,7 @@ export class GraphGeneratorService {
   private async mergeGraphsCorrectly(
     miniGraphs: AIGraphOutput[],
     maxNodes: number,
+    textBlockRanges?: Map<number, { start: number; end: number }>,
   ): Promise<{
     nodes: GraphNode[];
     edges: GraphEdge[];
@@ -564,13 +678,23 @@ export class GraphGeneratorService {
 
       // Add nodes with source chunk tracking
       for (const node of miniGraph.nodes || []) {
+        // Create sourceChunk object with textBlock range if available
+        const sourceChunkInfo = textBlockRanges?.get(i)
+          ? {
+              chunkIndex: i,
+              textBlockRange: textBlockRanges.get(i)!,
+            }
+          : undefined;
+
         allNodes.push({
           id: `${i}_${node.id}`, // Prefix with chunk index to avoid collisions
           title: node.title,
           description: node.description,
           nodeType: node.nodeType, // Semantic classification
           summary: node.summary, // 2-sentence contextual summary
-          sourceChunk: i,
+          pageReferences: node.pageReferences, // Pages where concept appears
+          keyQuote: node.keyQuote, // Representative quote
+          sourceChunk: sourceChunkInfo,
           metadata: node.metadata,
         });
       }
@@ -1183,6 +1307,207 @@ export class GraphGeneratorService {
   }
 
   // ============================================================
+  // QUOTE-TO-COORDINATE MATCHING
+  // ============================================================
+
+  /**
+   * Match AI-generated keyQuotes to precise PDF coordinates
+   *
+   * ALGORITHM:
+   * 1. For each node with a keyQuote:
+   *    a. Use matchQuoteToCoordinates() to find matching textBlocks
+   *    b. Convert matches to NodeDocumentReference format
+   *    c. Store in node.documentRefs
+   * 2. Track match quality metrics
+   * 3. Log warnings for failed matches
+   *
+   * GRACEFUL DEGRADATION:
+   * - If matching fails for a node, store keyQuote without coordinates
+   * - Node is still usable, just without highlighting capability
+   * - User can still see the concept, just can't click to highlight
+   *
+   * @param nodes - Nodes with keyQuotes from AI
+   * @param textBlocks - PDF text blocks with coordinates
+   * @returns Updated nodes with documentRefs + matching metrics
+   */
+  private matchQuotesToCoordinates(
+    nodes: GraphNode[],
+    textBlocks: TextBlock[],
+  ): {
+    nodes: GraphNode[];
+    metrics: ReturnType<typeof calculateMatchingMetrics>;
+  } {
+    const matchResults: QuoteMatchResult[] = [];
+    const updatedNodes: GraphNode[] = [];
+
+    for (const node of nodes) {
+      // Skip nodes without keyQuote
+      if (!node.keyQuote) {
+        this.logger.warn(`[matchQuotesToCoordinates] Node ${node.id} missing keyQuote`);
+        updatedNodes.push(node);
+        continue;
+      }
+
+      // Match quote to coordinates
+      const matchResult = matchQuoteToCoordinates(
+        node.keyQuote,
+        textBlocks,
+        { allowFuzzyMatch: true },
+        this.logger,
+      );
+
+      matchResults.push(matchResult);
+
+      // Create updated node with documentRefs
+      if (matchResult.references.length > 0) {
+        // Success: Store coordinate-based references
+        updatedNodes.push({
+          ...node,
+          documentRefs: { references: matchResult.references },
+        });
+
+        this.logger.debug(
+          `[matchQuotesToCoordinates] Matched node ${node.id} (${matchResult.metadata.matchType}, ${matchResult.references.length} blocks)`,
+        );
+      } else {
+        // Failed: Store node without coordinates (graceful degradation)
+        updatedNodes.push({
+          ...node,
+          documentRefs: { references: [] }, // Empty but structure preserved
+        });
+
+        this.logger.warn(
+          `[matchQuotesToCoordinates] No match found for node ${node.id}: "${node.keyQuote?.substring(0, 50)}..."`,
+        );
+      }
+    }
+
+    // Calculate aggregated metrics
+    const metrics = calculateMatchingMetrics(matchResults);
+
+    return {
+      nodes: updatedNodes,
+      metrics,
+    };
+  }
+
+  /**
+   * Smart quote-to-coordinate matching using hybrid strategy
+   *
+   * NEW APPROACH: Doesn't rely on AI returning keyQuote!
+   * Instead, we extract complete sentences from the document and use
+   * hybrid matching (exact word match + semantic validation).
+   *
+   * ALGORITHM:
+   * 1. For each node:
+   *    a. Extract complete sentences from textBlocks
+   *    b. Try exact word match (node.title in sentence)
+   *    c. Validate semantically (similarity with node.summary)
+   *    d. Fallback to semantic search if needed
+   * 2. Create documentRefs with coordinates
+   * 3. Track match quality metrics
+   *
+   * @param nodes - Nodes from AI (with title + summary)
+   * @param textBlocks - PDF text blocks with coordinates
+   * @returns Updated nodes with documentRefs + matching metrics
+   */
+  private async smartMatchQuotesToCoordinates(
+    nodes: GraphNode[],
+    textBlocks: TextBlock[],
+  ): Promise<{
+    nodes: GraphNode[];
+    metrics: {
+      totalNodes: number;
+      nodesWithRefs: number;
+      exactMatchCount: number;
+      semanticSearchCount: number;
+      fallbackCount: number;
+      averageSimilarity: number;
+    };
+  }> {
+    const { findRelevantSentencesForNode } = await import('../lib/matching/hybrid-quote-matcher');
+
+    const updatedNodes: GraphNode[] = [];
+    let exactMatchCount = 0;
+    let semanticSearchCount = 0;
+    let fallbackCount = 0;
+    let totalSimilarity = 0;
+    let nodesWithRefs = 0;
+
+    for (const node of nodes) {
+      try {
+        // Use hybrid matcher
+        const result = await findRelevantSentencesForNode(
+          {
+            title: node.title,
+            summary: node.summary || node.title, // Fallback to title if no summary
+          },
+          textBlocks,
+          {
+            openaiApiKey: process.env.OPENAI_API_KEY,
+            similarityThreshold: 0.7,
+            maxReferences: 3,
+          },
+          this.logger,
+        );
+
+        // Track metrics
+        if (result.metadata.strategy === 'exact-match') {
+          exactMatchCount++;
+        } else if (result.metadata.strategy === 'semantic-search') {
+          semanticSearchCount++;
+        } else {
+          fallbackCount++;
+        }
+
+        totalSimilarity += result.metadata.topSimilarity;
+
+        if (result.references.length > 0) {
+          nodesWithRefs++;
+
+          // Add documentRefs to node
+          updatedNodes.push({
+            ...node,
+            documentRefs: {
+              references: result.references,
+            } as any,
+          });
+
+          this.logger.debug(`[smartMatch] Node "${node.title}"`, {
+            strategy: result.metadata.strategy,
+            similarity: result.metadata.topSimilarity.toFixed(2),
+            refsCount: result.references.length,
+          });
+        } else {
+          // No references found
+          updatedNodes.push(node);
+          this.logger.warn(`[smartMatch] No references found for node "${node.title}"`);
+        }
+      } catch (error) {
+        // On error, keep node without refs
+        updatedNodes.push(node);
+        this.logger.error(`[smartMatch] Error matching node "${node.title}"`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const averageSimilarity = nodes.length > 0 ? totalSimilarity / nodes.length : 0;
+
+    return {
+      nodes: updatedNodes,
+      metrics: {
+        totalNodes: nodes.length,
+        nodesWithRefs,
+        exactMatchCount,
+        semanticSearchCount,
+        fallbackCount,
+        averageSimilarity,
+      },
+    };
+  }
+
+  // ============================================================
   // HELPER METHODS
   // ============================================================
 
@@ -1229,5 +1554,75 @@ export class GraphGeneratorService {
         });
       }
     }
+  }
+
+  /**
+   * Compute textBlock ranges for each chunk
+   *
+   * WHY: The hybrid quote matcher needs to know which textBlocks correspond
+   * to each chunk so it can search efficiently (only in relevant textBlocks)
+   * instead of searching the entire document.
+   *
+   * @param chunks - Text chunks with character positions
+   * @param textBlocks - All textBlocks from the document
+   * @returns Map of chunk index to textBlock range
+   */
+  private computeTextBlockRanges(
+    chunks: TextChunk[],
+    textBlocks: TextBlock[],
+  ): Map<number, { start: number; end: number }> {
+    const ranges = new Map<number, { start: number; end: number }>();
+
+    if (!textBlocks || textBlocks.length === 0) {
+      // No textBlocks available - each chunk gets empty range
+      chunks.forEach((chunk) => {
+        ranges.set(chunk.chunkIndex, { start: 0, end: 0 });
+      });
+      return ranges;
+    }
+
+    // Build cumulative character position map for textBlocks
+    // This tells us: textBlock[i] starts at character position X
+    let cumulativePosition = 0;
+    const textBlockPositions: number[] = [];
+
+    for (const block of textBlocks) {
+      textBlockPositions.push(cumulativePosition);
+      cumulativePosition += block.text.length + 1; // +1 for space between blocks
+    }
+
+    // For each chunk, find which textBlocks it spans
+    for (const chunk of chunks) {
+      const chunkStart = chunk.startIndex;
+      const chunkEnd = chunk.endIndex;
+
+      // Find first textBlock that starts at or before chunkStart
+      let startBlockIndex = 0;
+      for (let i = 0; i < textBlockPositions.length; i++) {
+        if (textBlockPositions[i] <= chunkStart) {
+          startBlockIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      // Find last textBlock that starts before chunkEnd
+      let endBlockIndex = startBlockIndex;
+      for (let i = startBlockIndex; i < textBlockPositions.length; i++) {
+        if (textBlockPositions[i] < chunkEnd) {
+          endBlockIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      // Make it exclusive (end + 1)
+      ranges.set(chunk.chunkIndex, {
+        start: startBlockIndex,
+        end: Math.min(endBlockIndex + 1, textBlocks.length),
+      });
+    }
+
+    return ranges;
   }
 }

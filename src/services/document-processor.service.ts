@@ -21,6 +21,10 @@ import {
   extractTextFromPDF,
 } from '../lib/extraction/pdf-extractor';
 import {
+  extractPDFWithCoordinates,
+} from '../lib/pdf/pdf-coordinate-extractor';
+import { TextBlock } from '../types/pdf.types';
+import {
   extractImagesFromPDF,
   filterDecorativeImages,
 } from '../lib/extraction/image-extractor';
@@ -124,6 +128,8 @@ export class DocumentProcessorService {
           extractionTime: Date.now() - startTime,
           warnings: quality.issues.map(i => i.message),
         },
+        // Include textBlocks for PDFs with coordinate extraction
+        textBlocks: (extracted as any).textBlocks,
       };
 
       logger.info('Document processed successfully', {
@@ -178,18 +184,45 @@ export class DocumentProcessorService {
    * Extract content from PDF file
    *
    * Why: PDFs require special handling for text and image extraction
+   * V2: Now includes coordinate-based extraction for precise highlighting
    *
    * @param file - PDF file
    * @param config - Processing configuration
-   * @returns Extracted content
+   * @returns Extracted content with text blocks and coordinates
    */
   private async extractFromPDF(
     file: Express.Multer.File,
     config: Required<DocumentProcessingConfig>
-  ): Promise<ExtractionResult> {
-    // Extract text
-    const textResult = await extractTextFromPDF(file.path);
-    const text = textResult.text;
+  ): Promise<ExtractionResult & { textBlocks?: TextBlock[] }> {
+    // Extract text WITH coordinates for precise highlighting
+    let text = '';
+    let textBlocks: TextBlock[] | undefined;
+
+    try {
+      // Try coordinate-based extraction first (pdfjs-dist)
+      const coordResult = await extractPDFWithCoordinates(file.path, {
+        combineTextBlocks: true,
+        sameLineThreshold: 2,
+        adjacentTextThreshold: 5,
+      });
+
+      text = this.sanitizeText(coordResult.fullText);
+      textBlocks = coordResult.textBlocks;
+
+      logger.info('PDF extracted with coordinates', {
+        totalPages: coordResult.totalPages,
+        textBlocks: textBlocks.length,
+      });
+    } catch (error) {
+      // Fallback to basic text extraction (pdf-parse)
+      logger.warn('Coordinate extraction failed, falling back to basic extraction', {
+        error: (error as Error).message,
+      });
+
+      const textResult = await extractTextFromPDF(file.path);
+      text = this.sanitizeText(textResult.text);
+      textBlocks = undefined; // No coordinates available
+    }
 
     // Extract images if enabled
     let images: ExtractedImage[] = [];
@@ -222,6 +255,7 @@ export class DocumentProcessorService {
       text,
       images,
       tables,
+      textBlocks,
     };
   }
 
@@ -237,8 +271,9 @@ export class DocumentProcessorService {
     try {
       const text = await fs.readFile(file.path, 'utf-8');
 
-      // Clean text
-      const cleaned = this.cleanText(text);
+      // Sanitize then clean text
+      const sanitized = this.sanitizeText(text);
+      const cleaned = this.cleanText(sanitized);
 
       return {
         text: cleaned,
@@ -252,6 +287,27 @@ export class DocumentProcessorService {
         { originalError: (error as Error).message }
       );
     }
+  }
+
+  /**
+   * Sanitize text to remove invalid UTF-8 characters
+   *
+   * Why: PostgreSQL rejects null bytes and invalid UTF-8 sequences
+   * Must be called before storing in database
+   *
+   * @param text - Raw extracted text
+   * @returns Sanitized text safe for database storage
+   */
+  private sanitizeText(text: string): string {
+    if (!text) return '';
+
+    // Remove null bytes (0x00) which PostgreSQL UTF8 doesn't allow
+    let sanitized = text.replace(/\x00/g, '');
+
+    // Remove other control characters except newlines, tabs, carriage returns
+    sanitized = sanitized.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    return sanitized;
   }
 
   /**

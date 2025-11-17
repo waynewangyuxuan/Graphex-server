@@ -63,6 +63,10 @@ model Document {
   status        DocumentStatus @default(processing)
   errorMessage  String?        @map("error_message") @db.Text
 
+  // Enhanced metadata (JSONB)
+  // Stores: textBlocks (PDF coordinates), pageCount, wordCount, imageCount, etc.
+  metadata      Json?          // JSONB: flexible metadata for document processing
+
   // Timestamps
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
