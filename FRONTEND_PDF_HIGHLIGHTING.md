@@ -43,6 +43,33 @@ This guide explains how to implement **precise PDF highlighting** in the Graphex
 
 **Note**: `textBlocks` in document metadata use `bbox` (from PDF extraction), while `documentRefs` in graph nodes use `coordinates` (from smart matching). Both represent the same bounding box structure.
 
+### GET /api/v1/documents/:id/file
+
+**NEW: Serves the actual PDF file for rendering**
+
+```
+GET /api/v1/documents/:id/file
+```
+
+**Response**:
+- Content-Type: `application/pdf`
+- Content-Disposition: `inline; filename="document-title.pdf"`
+- Cache-Control: `public, max-age=31536000` (1 year)
+- Body: PDF file stream
+
+**Example usage**:
+```typescript
+// Fetch PDF for rendering with PDF.js
+const response = await fetch(`/api/v1/documents/${documentId}/file`);
+const pdfBlob = await response.blob();
+const pdfUrl = URL.createObjectURL(pdfBlob);
+
+// Use with PDF.js
+const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+```
+
+---
+
 ### GET /api/v1/graphs/:id
 
 **Response now includes coordinate-based `documentRefs` in nodes**:
@@ -262,14 +289,21 @@ async function loadDocument(documentId: string) {
 }
 ```
 
-### Step 2: Render PDF with PDF.js
+### Step 2: Fetch and Render PDF with PDF.js
 
 ```typescript
 import * as pdfjsLib from 'pdfjs-dist';
 
-async function renderPDF(pdfUrl: string, containerEl: HTMLElement) {
+async function fetchAndRenderPDF(documentId: string, containerEl: HTMLElement) {
+  // Fetch PDF file from backend
+  const response = await fetch(`/api/v1/documents/${documentId}/file`);
+  const pdfBlob = await response.blob();
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  // Load PDF with PDF.js
   const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
 
+  // Render all pages
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: 1.5 });
@@ -286,6 +320,9 @@ async function renderPDF(pdfUrl: string, containerEl: HTMLElement) {
       viewport
     }).promise;
   }
+
+  // Clean up blob URL
+  URL.revokeObjectURL(pdfUrl);
 }
 ```
 

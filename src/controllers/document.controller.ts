@@ -290,6 +290,137 @@ export const getDocumentStatus = async (
   }
 };
 
+/**
+ * Serve document file (PDF, text, etc.)
+ * GET /api/v1/documents/:id/file
+ *
+ * WHY: Frontend needs access to the actual PDF file for rendering
+ * and highlighting. This endpoint streams the file with proper
+ * content-type headers.
+ *
+ * Flow:
+ * 1. Find document in database
+ * 2. Verify file exists on filesystem
+ * 3. Stream file to client with correct MIME type
+ * 4. Set proper headers for caching and filename
+ */
+export const getDocumentFile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const extReq = req as ExtendedRequest;
+
+  try {
+    const { id } = req.params;
+
+    logger.info('Serving document file', {
+      requestId: extReq.requestId,
+      documentId: id,
+    });
+
+    // Find document in database
+    const document = await prisma.document.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        filePath: true,
+        sourceType: true,
+      },
+    });
+
+    if (!document) {
+      return sendError(
+        res,
+        ErrorCode.DOCUMENT_NOT_FOUND,
+        `Document with ID ${id} not found`,
+        404,
+        extReq.requestId
+      );
+    }
+
+    if (!document.filePath) {
+      return sendError(
+        res,
+        ErrorCode.INVALID_REQUEST,
+        'Document has no associated file',
+        400,
+        extReq.requestId
+      );
+    }
+
+    // Check if file exists
+    const fs = await import('fs/promises');
+
+    try {
+      await fs.access(document.filePath);
+    } catch (error) {
+      logger.error('Document file not found on filesystem', {
+        requestId: extReq.requestId,
+        documentId: id,
+        filePath: document.filePath,
+      });
+
+      return sendError(
+        res,
+        ErrorCode.DOCUMENT_NOT_FOUND,
+        'Document file not found on server',
+        404,
+        extReq.requestId
+      );
+    }
+
+    // Determine MIME type
+    const mimeType = getMimeType(document.sourceType);
+    const extension = getFileExtension(document.sourceType);
+    const filename = `${document.title}${extension}`;
+
+    // Set headers
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+
+    // Stream file
+    const fileStream = (await import('fs')).createReadStream(document.filePath);
+
+    fileStream.on('error', (error) => {
+      logger.error('Error streaming document file', {
+        requestId: extReq.requestId,
+        documentId: id,
+        error: error.message,
+      });
+
+      if (!res.headersSent) {
+        sendError(
+          res,
+          ErrorCode.INTERNAL_ERROR,
+          'Failed to stream document file',
+          500,
+          extReq.requestId
+        );
+      }
+    });
+
+    fileStream.pipe(res);
+
+    logger.info('Document file served successfully', {
+      requestId: extReq.requestId,
+      documentId: id,
+      filename,
+      mimeType,
+    });
+  } catch (error) {
+    logger.error('Failed to serve document file', {
+      requestId: extReq.requestId,
+      documentId: req.params.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    next(error);
+  }
+};
+
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
@@ -329,5 +460,41 @@ function mapDocumentStatus(status: string): DocumentStatus {
       return DocumentStatus.FAILED;
     default:
       return DocumentStatus.READY;
+  }
+}
+
+/**
+ * Get MIME type from document source type
+ *
+ * WHY: Browser needs correct Content-Type header to render file properly
+ */
+function getMimeType(sourceType: string): string {
+  switch (sourceType) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'text':
+      return 'text/plain';
+    case 'markdown':
+      return 'text/markdown';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+/**
+ * Get file extension from document source type
+ *
+ * WHY: Provide meaningful filename to browser for download/display
+ */
+function getFileExtension(sourceType: string): string {
+  switch (sourceType) {
+    case 'pdf':
+      return '.pdf';
+    case 'text':
+      return '.txt';
+    case 'markdown':
+      return '.md';
+    default:
+      return '';
   }
 }

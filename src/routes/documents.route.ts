@@ -10,6 +10,7 @@ import {
   createDocumentFromUrl,
   getDocumentById,
   getDocumentStatus,
+  getDocumentFile,
 } from '../controllers/document.controller';
 import { fileUploadLimiter, urlExtractionLimiter } from '../middleware/rate-limiter.middleware';
 import { validate } from '../middleware/validation.middleware';
@@ -87,6 +88,21 @@ router.get(
   '/:id/status',
   validate(DocumentIdParamSchema),
   getDocumentStatus
+);
+
+/**
+ * GET /api/v1/documents/:id/file
+ * Serve the actual document file (PDF, text, etc.)
+ *
+ * Flow: Validation → Controller → Stream File
+ *
+ * WHY: Frontend needs access to the PDF file for rendering with PDF.js
+ * and displaying with coordinate-based highlighting.
+ */
+router.get(
+  '/:id/file',
+  validate(DocumentIdParamSchema),
+  getDocumentFile
 );
 
 export default router;
