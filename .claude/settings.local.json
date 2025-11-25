@@ -54,7 +54,8 @@
       "Bash(DATABASE_URL=\"postgresql://graphex:password@localhost:5432/graphex?schema=public\" npx prisma migrate:*)",
       "Bash(tee:*)",
       "Bash(npm run type-check:*)",
-      "Bash(.env)"
+      "Bash(.env)",
+      "Bash(git -C /Users/waynewang/Graphex-server log --oneline --all)"
     ],
     "deny": [],
     "ask": []

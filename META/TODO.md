@@ -602,3 +602,64 @@ Following previous TODO plan with graph generation pipeline now fully operationa
 
 **Estimated Effort**: 2-3 hours (mostly repositioning note panel + scroll-to-text)
 
+---
+
+## 2024-11-25
+
+### Architecture Technical Debt (From Code Review)
+
+**Context**: External code review identified structural inconsistencies between documented architecture and actual implementation. These issues affect maintainability, testability, and code reuse.
+
+**Reference**: [META/REFACTOR/REFACTOR_PLAN.md](META/REFACTOR/REFACTOR_PLAN.md)
+
+#### Issue 1: Controllers Own Persistence (Priority: Medium)
+- [ ] **Extract Prisma calls from controllers to services**
+  - [graph.controller.ts:57](src/controllers/graph.controller.ts#L57) - Direct `prisma.document.findUnique()`
+  - [graph.controller.ts:95](src/controllers/graph.controller.ts#L95) - Direct `prisma.document.create()`
+  - [graph.controller.ts:137](src/controllers/graph.controller.ts#L137) - `saveGraphToDatabase()` helper in controller
+  - [graph.controller.ts:232](src/controllers/graph.controller.ts#L232) - Direct `prisma.graph.findUnique()`
+  - **Impact**: Can't reuse services, harder to test, violates SRP
+  - **Solution**: Move to `graph.service.ts` and `document.service.ts`
+
+#### Issue 2: Lib Layer Dependency Inversion (Priority: High)
+- [ ] **Decouple `lib/` from `services/`**
+  - [semantic-deduplicator.ts:20](src/lib/graph/semantic-deduplicator.ts#L20) imports `AIOrchestrator` from services
+  - Violates [src/META.md:74](src/META.md#L74) - "No direct HTTP or framework dependencies"
+  - **Impact**: Can't reuse algorithms without entire API stack
+  - **Solution**: Inject slim interface or move deduplicator to services/
+
+#### Issue 3: Unused Queue/Worker Scaffolding (Priority: Low)
+- [ ] **Wire up BullMQ or remove scaffolding**
+  - `QueueService` only referenced in its own test file
+  - [graph.controller.ts:320](src/controllers/graph.controller.ts#L320) returns hardcoded `status: 'completed'`
+  - `queues/` and `workers/` directories describe pipeline that isn't integrated
+  - **Impact**: Misleading structure, dead code
+  - **Solution**: Either complete BullMQ integration OR delete scaffolding
+
+#### Recommended Priority Order
+1. **First**: Decouple `lib/` from `services/` - blocks algorithm reuse
+2. **Second**: Decide on queues - wire up BullMQ or delete scaffolding
+3. **Third**: Extract Prisma calls - refactor during next feature work
+
+#### Strategic Decision Required (From Follow-up Review)
+
+Before tactical fixes, choose architectural direction:
+
+| Option | Description | Effort | When |
+|--------|-------------|--------|------|
+| **A: Complete Layering** | Move Prisma to services, proper separation | 8-10 hrs | Scaling team/complexity |
+| **B: Collapse Layers** | Delete ServiceContainer, direct imports | 3-4 hrs | MVP, small team |
+| **C: Module-Centric** | Group by domain (`modules/graph/`, `modules/document/`) | 12-15 hrs | Post-MVP |
+
+**Current recommendation**: Option B (collapse) or targeted fixes only.
+
+**Additional consideration**: Replace `ServiceContainer` singleton with factory functions for explicit dependencies.
+
+**Full analysis**: [META/REFACTOR/REFACTOR_PLAN.md](META/REFACTOR/REFACTOR_PLAN.md)
+
+**Agents to use** (from CLAUDE.md):
+- `prisma-database-architect` - For service layer database abstraction
+- `express-api-builder` - For controller/service restructuring
+- `bullmq-job-processor` - For queue integration decision
+- `comprehensive-test-writer` - For regression tests after refactor
+
